@@ -1,103 +1,241 @@
-import Image from "next/image";
+import { FeaturesSection } from "@/components/homepage-sections/features-section";
+import { HeroSection } from "@/components/homepage-sections/hero-section";
+import { LandlordSection } from "@/components/homepage-sections/landlord-section";
+import { ValuationSection } from "@/components/homepage-sections/valuation-section";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Listd - Buy, Rent, or Sell Properties Without Commission | Philippine Real Estate",
+  description:
+    "Find your dream property or list your own with Listd. Zero commissions, streamlined process, and thousands of premium listings across the Philippines to explore.",
+  keywords: [
+    "real estate Philippines",
+    "property listing",
+    "no commission real estate",
+    "buy property Philippines",
+    "sell property Philippines",
+    "rent property Philippines",
+    "BGC condos",
+    "Manila properties",
+    "Makati condominiums",
+    "Cebu real estate",
+    "Philippine property portal",
+    "luxury properties Philippines",
+    "residential properties Metro Manila",
+    "affordable homes Philippines",
+    "property valuation Philippines",
+  ],
+  alternates: {
+    canonical: "https://listd.com",
+  },
+  openGraph: {
+    title: "Listd - Find Your Dream Property | Zero Commission Real Estate Platform",
+    description:
+      "Browse thousands of properties with zero commission. Buy, sell, or rent properties across the Philippines with our modern real estate platform.",
+    images: [
+      {
+        url: "/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Listd - The Modern Way to Buy, Sell or Rent Properties",
+      },
+    ],
+    locale: "en_PH",
+    type: "website",
+  },
+};
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  // Organization Schema
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "Listd",
+    url: "https://listd.com",
+    logo: "https://listd.com/logo.png",
+    description: "A modern platform to buy, sell, or rent properties without any commissions.",
+    sameAs: [
+      "https://www.facebook.com/listd",
+      "https://www.twitter.com/listd",
+      "https://www.instagram.com/listd",
+      "https://www.linkedin.com/company/listd",
+    ],
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: "123 Real Estate Avenue",
+      addressLocality: "Property City",
+      addressRegion: "PR",
+      postalCode: "12345",
+      addressCountry: "Philippines",
+    },
+    contactPoint: {
+      "@type": "ContactPoint",
+      telephone: "+1-555-555-5555",
+      contactType: "customer service",
+    },
+    // Add real estate specific properties
+    areaServed: "Philippines",
+    serviceType: ["Property Listings", "Real Estate Valuation", "Property Management"],
+  };
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+  // Real Estate Website Schema
+  const webSiteSchema = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "Listd",
+    url: "https://listd.com",
+    potentialAction: {
+      "@type": "SearchAction",
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate: "https://listd.com/properties?location={search_term}",
+      },
+      "query-input": "required name=search_term",
+    },
+  };
+
+  // Local Business Schema - RealEstateAgent type
+  const localBusinessSchema = {
+    "@context": "https://schema.org",
+    "@type": "RealEstateAgent",
+    name: "Listd Philippines",
+    image: "https://listd.com/logo.png",
+    "@id": "https://listd.com",
+    url: "https://listd.com",
+    telephone: "+1-555-555-5555",
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: "123 Real Estate Avenue",
+      addressLocality: "Makati City",
+      addressRegion: "Metro Manila",
+      postalCode: "12345",
+      addressCountry: "PH",
+    },
+    geo: {
+      "@type": "GeoCoordinates",
+      latitude: 14.5547, // Makati City coordinates
+      longitude: 121.0244,
+    },
+    priceRange: "₱₱₱",
+    openingHoursSpecification: {
+      "@type": "OpeningHoursSpecification",
+      dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+      opens: "09:00",
+      closes: "18:00",
+    },
+    areaServed: [
+      {
+        "@type": "City",
+        name: "Metro Manila",
+      },
+      {
+        "@type": "City",
+        name: "Cebu City",
+      },
+      {
+        "@type": "City",
+        name: "Davao City",
+      },
+    ],
+    makesOffer: [
+      {
+        "@type": "Offer",
+        itemOffered: {
+          "@type": "Service",
+          name: "Property Listings",
+        },
+      },
+      {
+        "@type": "Offer",
+        itemOffered: {
+          "@type": "Service",
+          name: "Property Valuation",
+        },
+      },
+      {
+        "@type": "Offer",
+        itemOffered: {
+          "@type": "Service",
+          name: "Property Management",
+        },
+      },
+    ],
+  };
+
+  // FAQ Schema for common real estate questions
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: [
+      {
+        "@type": "Question",
+        name: "How does Listd offer zero commission property listings?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Listd operates on a modern business model that eliminates traditional agent commissions. We use technology to streamline the property buying, selling, and renting process, passing these savings directly to our users.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "What areas in the Philippines does Listd cover?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Listd covers major metropolitan areas across the Philippines including Metro Manila, BGC, Makati, Quezon City, Cebu, Davao, and more. Our platform features properties from urban condominiums to suburban homes and rural investments.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "How can I list my property on Listd?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Listing your property on Listd is simple. Create an account, click on 'List a Property', fill in your property details, upload photos, set your price, and publish. Our streamlined process takes just minutes, and your listing will be visible to thousands of potential buyers or renters.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "What types of properties can I find on Listd?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Listd features a diverse range of properties including condominiums, houses and lots, commercial spaces, vacant lots, and warehouses. Whether you're looking for a luxury condo in BGC, a family home in Quezon City, or an investment property in Cebu, Listd has options for every need and budget.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "Is Listd available throughout the Philippines?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Yes, Listd is available nationwide with particularly strong presence in Metro Manila, Cebu, and Davao. We're continually expanding our property listings across all regions of the Philippines to serve property buyers, sellers, and renters throughout the country.",
+        },
+      },
+    ],
+  };
+
+  return (
+    <>
+      {/* Organization Schema */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+      />
+      {/* Website Schema */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(webSiteSchema) }}
+      />
+      {/* Local Business Schema */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessSchema) }}
+      />
+      {/* FAQ Schema */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+      />
+      <HeroSection />
+      <ValuationSection />
+      <FeaturesSection />
+      <LandlordSection />
+    </>
   );
 }

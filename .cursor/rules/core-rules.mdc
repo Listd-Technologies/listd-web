@@ -1,0 +1,160 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# AI Rules for Listd Web Application
+
+This document outlines the guidelines, best practices, and rules that AI assistants should follow when contributing to the Listd web application project. These rules ensure consistency, maintainability, and alignment with the project's architecture and design principles.
+
+## General Guidelines
+
+1. **Understand the Architecture**: Thoroughly analyze the existing codebase before making contributions. The application is built with Next.js 15 (App Router), React 19, and TypeScript.
+
+2. **Focus on Frontend Only**: Remember that this project does not include API development within Next.js. The frontend integrates with an existing backend service.
+
+3. **Follow the Project Structure**: Maintain the established directory structure when creating new files or modifying existing ones.
+
+4. **Code Style**: Use Biome's formatting rules. If in doubt, format code using `pnpm format`.
+
+## Component Development
+
+1. **Use shadcn/ui Components**: Leverage the existing shadcn/ui components. Don't reinvent what's already available.
+
+2. **Component Hierarchy**:
+   - Create atomic components in `components/ui/`
+   - Create form components in `components/forms/`
+   - Create layout components in `components/layout/`
+
+3. **Component Styling**:
+   - Use Tailwind CSS for styling
+   - Follow the established color scheme to align with the mobile app
+   - Use the `cn` utility for conditional class names
+
+4. **Animations**:
+   - Use Framer Motion for animations and transitions
+   - Keep animations subtle and purposeful
+   - Ensure animations work well on all devices (responsive)
+
+## State Management
+
+1. **React Context**:
+   - Use React Context for UI state that spans across multiple components
+   - Create context providers in the `context/` directory
+   - Keep contexts focused and specific
+
+2. **React Query**:
+   - Use TanStack React Query for all server state
+   - Implement custom hooks in `hooks/api/` for API interactions
+   - Follow proper caching and invalidation patterns
+
+3. **Form State**:
+   - Use React Hook Form with Zod validation
+   - Implement form schemas in dedicated files
+
+## API Integration
+
+1. **Backend Communication**:
+   - Use Axios for HTTP requests
+   - Create service functions in the `services/` directory
+   - Use React Query's mutation and query hooks
+
+2. **Error Handling**:
+   - Implement proper error handling for all API calls
+   - Provide user-friendly error messages
+
+## TypeScript Usage
+
+1. **Type Definitions**:
+   - Place shared types in the `types/` directory
+   - Use proper typing for all variables, functions, and components
+   - Avoid using `any` - use `unknown` if type is truly unknown
+
+2. **Type Safety**:
+   - Ensure all Props interfaces are properly defined
+   - Use proper return types for functions and hooks
+
+## Performance Considerations
+
+1. **Optimizations**:
+   - Use React's memo, useMemo, and useCallback appropriately
+   - Implement virtualization for long lists
+   - Optimize images and assets
+
+2. **Code Splitting**:
+   - Utilize Next.js's built-in code splitting
+   - Use dynamic imports for heavy components
+
+## Feature-Specific Guidelines
+
+### Property Listing Search
+- Implement efficient filters with debounce techniques
+- Use React Query for caching search results
+- Consider using URL parameters for shareable search states
+
+### Property Valuation
+- Create reusable chart components
+- Implement proper loading states for valuation data
+
+### User Onboarding
+- Follow established authentication flow with Clerk
+- Create step-by-step forms with proper validation
+
+### Messaging System
+- Implement real-time updates where necessary
+- Create efficient message thread components
+
+### Listing Management
+- Implement proper form validation for listing creation
+- Create reusable upload components for images and documents
+
+## Documentation
+
+1. **Code Comments**:
+   - Add comments for complex logic
+   - Document component props with JSDoc
+
+2. **README Updates**:
+   - Update README.md when adding major features
+   - Document any changes to the build process
+
+## Testing Considerations
+
+1. **Component Testing**:
+   - Ensure components are testable
+   - Consider test coverage when designing components
+
+2. **Accessibility**:
+   - Ensure all components meet WCAG standards
+   - Use proper aria attributes
+
+## Implementation Process
+
+1. **Feature Planning**:
+   - Break down features into manageable components
+   - Start with data structures and type definitions
+
+2. **Implementation Order**:
+   - Create API hooks first
+   - Develop UI components
+   - Implement business logic
+   - Add animations and polish
+
+3. **Final Checks**:
+   - Ensure code is properly formatted with Biome
+   - Review for type safety
+   - Verify mobile responsiveness
+
+## Debugging Guidelines
+
+1. **Browser Tools**:
+   - Always use the MCP browser tools when debugging application issues
+   - Utilize browser console logs, network errors, and screenshots to diagnose problems
+   - Run accessibility, performance, and SEO audits to identify potential improvements
+
+2. **Troubleshooting Process**:
+   - Start with browser console logs to identify JavaScript errors
+   - Check network requests for API communication issues
+   - Take screenshots to document UI inconsistencies
+   - Run appropriate audits based on the issue type (performance, accessibility, etc.)
+   - Use debugger mode for complex interactive problems
