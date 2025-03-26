@@ -1,12 +1,5 @@
 "use client";
 
-import {
-  DISABLED_PROPERTY_TYPES,
-  type ListingType,
-  type PropertyType,
-  getPropertyListingsFilter,
-  useListingContext,
-} from "@/components/providers/listing-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,11 +15,15 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { type PropertyListingsFilter } from "@/hooks/api/usePropertyListings";
+import { useUrlSync } from "@/hooks/useUrlSync";
+import { type PropertyFiltersState, usePropertyFiltersStore } from "@/lib/stores/propertyFilters";
 import { cn } from "@/lib/utils";
 import { type BaseComponentProps, type LoadingProps } from "@/types";
+import { DISABLED_PROPERTY_TYPES, type ListingType, type PropertyType } from "@/types/property";
+import { debounce } from "lodash";
 import { ChevronDown, Search, X } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import React, { useState, useRef, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import React, { useState, useRef, useEffect, useMemo, useCallback, memo } from "react";
 
 // Property types that match our context
 const PROPERTY_TYPES = [
@@ -152,123 +149,137 @@ export interface PropertyFiltersProps extends BaseComponentProps, LoadingProps {
 }
 
 // Price Filter Component
-function PriceFilter({ compact = false, onPopoverClose }: FilterComponentProps) {
-  const { state, updateFilters } = useListingContext();
+const PriceFilter = memo(function PriceFilter({
+  compact = false,
+  onPopoverClose,
+}: FilterComponentProps) {
+  // Selective store access to prevent unnecessary re-renders
+  const listingType = usePropertyFiltersStore((state) => state.filters.listingType);
+  const minPrice = usePropertyFiltersStore((state) => state.filters.minPrice);
+  const maxPrice = usePropertyFiltersStore((state) => state.filters.maxPrice);
+  const minSqmPrice = usePropertyFiltersStore((state) => state.filters.minSqmPrice);
+  const maxSqmPrice = usePropertyFiltersStore((state) => state.filters.maxSqmPrice);
+  const activePriceType = usePropertyFiltersStore((state) => state.filters.activePriceType);
+  const updateFilters = usePropertyFiltersStore((state) => state.updateFilters);
+
   const [open, setOpen] = useState(false);
-  const [priceType, setPriceType] = useState<"total" | "sqm">(state.activePriceType);
-  const [minPrice, setMinPrice] = useState(state.minPrice?.toString() || "0");
-  const [maxPrice, setMaxPrice] = useState(state.maxPrice?.toString() || "0");
-  const [minSqmPrice, setMinSqmPrice] = useState(state.minSqmPrice?.toString() || "0");
-  const [maxSqmPrice, setMaxSqmPrice] = useState(state.maxSqmPrice?.toString() || "0");
+  const [priceType, setPriceType] = useState<"total" | "sqm">(activePriceType);
+  const [localMinPrice, setLocalMinPrice] = useState(minPrice?.toString() || "0");
+  const [localMaxPrice, setLocalMaxPrice] = useState(maxPrice?.toString() || "0");
+  const [localMinSqmPrice, setLocalMinSqmPrice] = useState(minSqmPrice?.toString() || "0");
+  const [localMaxSqmPrice, setLocalMaxSqmPrice] = useState(maxSqmPrice?.toString() || "0");
 
-  // Get the appropriate price options based on listing type
-  const minPriceOptions =
-    state.currentListingType === "rent" ? RENT_MIN_PRICE_OPTIONS : BUY_MIN_PRICE_OPTIONS;
-  const maxPriceOptions =
-    state.currentListingType === "rent" ? RENT_MAX_PRICE_OPTIONS : BUY_MAX_PRICE_OPTIONS;
+  // Get the appropriate price options based on listing type - memoized
+  const priceOptions = useMemo(
+    () => ({
+      minPriceOptions: listingType === "rent" ? RENT_MIN_PRICE_OPTIONS : BUY_MIN_PRICE_OPTIONS,
+      maxPriceOptions: listingType === "rent" ? RENT_MAX_PRICE_OPTIONS : BUY_MAX_PRICE_OPTIONS,
+    }),
+    [listingType]
+  );
 
-  // Update values when context state changes
+  // Update local state when store changes - more specific dependencies
   useEffect(() => {
-    setMinPrice(state.minPrice?.toString() || "0");
-    setMaxPrice(state.maxPrice?.toString() || "0");
-    setMinSqmPrice(state.minSqmPrice?.toString() || "0");
-    setMaxSqmPrice(state.maxSqmPrice?.toString() || "0");
-    setPriceType(state.activePriceType);
-  }, [state.minPrice, state.maxPrice, state.minSqmPrice, state.maxSqmPrice, state.activePriceType]);
+    setLocalMinPrice(minPrice?.toString() || "0");
+    setLocalMaxPrice(maxPrice?.toString() || "0");
+  }, [minPrice, maxPrice]);
 
-  // Reset price values
-  const handleReset = () => {
+  useEffect(() => {
+    setLocalMinSqmPrice(minSqmPrice?.toString() || "0");
+    setLocalMaxSqmPrice(maxSqmPrice?.toString() || "0");
+  }, [minSqmPrice, maxSqmPrice]);
+
+  useEffect(() => {
+    setPriceType(activePriceType);
+  }, [activePriceType]);
+
+  // Handle price selection with immediate updates
+  const handlePriceChange = useCallback(
+    (field: string, value: string) => {
+      const numValue = parseInt(value) || 0;
+
+      // Update local state
+      switch (field) {
+        case "minPrice":
+          setLocalMinPrice(value);
+          break;
+        case "maxPrice":
+          setLocalMaxPrice(value);
+          break;
+        case "minSqmPrice":
+          setLocalMinSqmPrice(value);
+          break;
+        case "maxSqmPrice":
+          setLocalMaxSqmPrice(value);
+          break;
+      }
+
+      // Update store immediately
+      updateFilters({
+        [field]: numValue,
+      });
+    },
+    [updateFilters]
+  );
+
+  // Reset price values - memoized callback
+  const handleReset = useCallback(() => {
+    console.log("🧹 Resetting price filter values");
+
     // Reset all price inputs
-    setMinPrice("0");
-    setMaxPrice("0");
-    setMinSqmPrice("0");
-    setMaxSqmPrice("0");
+    setLocalMinPrice("0");
+    setLocalMaxPrice("0");
+    setLocalMinSqmPrice("0");
+    setLocalMaxSqmPrice("0");
 
-    // Update context with cleared values
-    updateFilters({
-      minPrice: 0,
-      maxPrice: 0,
-      minSqmPrice: 0,
-      maxSqmPrice: 0,
-    });
+    // Get the clearAllFilters function from useUrlSync
+    const { clearAllFilters } = useUrlSync();
+    clearAllFilters();
 
     // Close popover if needed
     setOpen(false);
-    if (onPopoverClose) {
-      onPopoverClose();
-    }
-  };
+    onPopoverClose?.();
+  }, [onPopoverClose]);
 
-  // Update filters on apply
-  const handleApply = () => {
-    // Create the price filter updates
-    const priceUpdates = {
-      minPrice: parseInt(minPrice) || 0,
-      maxPrice: parseInt(maxPrice) || 0,
-      minSqmPrice: parseInt(minSqmPrice) || 0,
-      maxSqmPrice: parseInt(maxSqmPrice) || 0,
-      activePriceType: priceType,
-    };
+  // Update price type immediately
+  const handlePriceTypeChange = useCallback(
+    (value: string) => {
+      setPriceType(value as "total" | "sqm");
+      updateFilters({
+        activePriceType: value as "total" | "sqm",
+      });
+    },
+    [updateFilters]
+  );
 
-    // Before updating, prepare URL parameters
-    const urlParams: Record<string, string | number> = {};
+  // Format price for display - memoized
+  const formatPrice = useCallback(
+    (price: number) => {
+      // Different format based on listing type
+      const isRent = listingType === "rent";
 
-    // Essential params - always include these
-    urlParams["listing-type"] = state.currentListingType === "rent" ? "for-rent" : "for-sale";
-    urlParams["property-type"] = state.currentPropertyType;
-    urlParams["price-type"] = priceType;
+      if (price >= 1000000) {
+        return `${(price / 1000000).toFixed(1)}M${isRent ? "/mo" : ""}`;
+      } else if (price >= 1000) {
+        return `${(price / 1000).toFixed(0)}K${isRent ? "/mo" : ""}`;
+      }
+      return `${price}${isRent ? "/mo" : ""}`;
+    },
+    [listingType]
+  );
 
-    // Price specific parameters - set based on form values
-    if (parseInt(minPrice) > 0) urlParams["min-price"] = parseInt(minPrice);
-    if (parseInt(maxPrice) > 0) urlParams["max-price"] = parseInt(maxPrice);
-    if (parseInt(minSqmPrice) > 0) urlParams["min-sqm-price"] = parseInt(minSqmPrice);
-    if (parseInt(maxSqmPrice) > 0) urlParams["max-sqm-price"] = parseInt(maxSqmPrice);
-
-    // Other existing parameters
-    if (state.location) urlParams.location = state.location;
-    if (state.minBedrooms && state.minBedrooms > 0) urlParams["min-bedrooms"] = state.minBedrooms;
-    if (state.minBathrooms && state.minBathrooms > 0)
-      urlParams["min-bathrooms"] = state.minBathrooms;
-    if (state.minArea && state.minArea > 0) urlParams["min-area"] = state.minArea;
-    if (state.maxArea && state.maxArea > 0) urlParams["max-area"] = state.maxArea;
-
-    console.log("Setting URL params for price filters:", urlParams);
-
-    // First update URL params
-    updateFilters(priceUpdates);
-
-    setOpen(false);
-
-    if (onPopoverClose) {
-      onPopoverClose();
-    }
-  };
-
-  // Format price for display
-  const formatPrice = (price: number) => {
-    // Different format based on listing type
-    const isRent = state.currentListingType === "rent";
-
-    if (price >= 1000000) {
-      return `${(price / 1000000).toFixed(1)}M${isRent ? "/mo" : ""}`;
-    } else if (price >= 1000) {
-      return `${(price / 1000).toFixed(0)}K${isRent ? "/mo" : ""}`;
-    }
-    return `${price}${isRent ? "/mo" : ""}`;
-  };
-
-  // Function to get display text for the price button
-  const getPriceButtonText = () => {
+  // Function to get display text for the price button - memoized
+  const getPriceButtonText = useCallback(() => {
     // Get values for both price types
-    const minTotalPrice = parseInt(minPrice);
-    const maxTotalPrice = parseInt(maxPrice);
-    const minPerSqm = parseInt(minSqmPrice);
-    const maxPerSqm = parseInt(maxSqmPrice);
+    const minTotalPrice = parseInt(localMinPrice);
+    const maxTotalPrice = parseInt(localMaxPrice);
+    const minPerSqm = parseInt(localMinSqmPrice);
+    const maxPerSqm = parseInt(localMaxSqmPrice);
 
     // When the popover is open, use the current tab selection (priceType)
     // When the popover is closed, use the saved context value (state.activePriceType)
-    const activeType = open ? priceType : state.activePriceType;
-    const isRent = state.currentListingType === "rent";
+    const activeType = open ? priceType : activePriceType;
+    const isRent = listingType === "rent";
 
     if (activeType === "total") {
       if (minTotalPrice === 0 && maxTotalPrice === 0) return "Price";
@@ -285,25 +296,49 @@ function PriceFilter({ compact = false, onPopoverClose }: FilterComponentProps) 
       if (minPerSqm === maxPerSqm) return `₱${formatPrice(minPerSqm)}/sqm${isRent ? "/mo" : ""}`;
       return `₱${formatPrice(minPerSqm)} - ₱${formatPrice(maxPerSqm)}/sqm${isRent ? "/mo" : ""}`;
     }
-  };
+  }, [
+    localMinPrice,
+    localMaxPrice,
+    localMinSqmPrice,
+    localMaxSqmPrice,
+    open,
+    priceType,
+    activePriceType,
+    listingType,
+    formatPrice,
+  ]);
+
+  // Handle tab value change
+  const handleTabValueChange = useCallback(
+    (value: string) => {
+      handlePriceTypeChange(value as "total" | "sqm");
+    },
+    [handlePriceTypeChange]
+  );
+
+  // Memoize the Button component to prevent unnecessary rerenders
+  const buttonContent = useMemo(
+    () => (
+      <Button
+        variant="outline"
+        size={compact ? "sm" : undefined}
+        className={cn(
+          "flex items-center gap-1 text-foreground justify-between font-normal",
+          compact
+            ? "h-9 whitespace-nowrap shrink-0 min-w-[120px] w-[120px]"
+            : "h-10 min-w-[120px] w-[120px]"
+        )}
+      >
+        <span className="truncate max-w-[80%] text-left">{getPriceButtonText()}</span>
+        <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-1" />
+      </Button>
+    ),
+    [compact, getPriceButtonText]
+  );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size={compact ? "sm" : undefined}
-          className={cn(
-            "flex items-center gap-1 text-foreground justify-between font-normal",
-            compact
-              ? "h-9 whitespace-nowrap shrink-0 min-w-[120px] w-[120px]"
-              : "h-10 min-w-[120px] w-[120px]"
-          )}
-        >
-          <span className="truncate max-w-[80%] text-left">{getPriceButtonText()}</span>
-          <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-1" />
-        </Button>
-      </PopoverTrigger>
+      <PopoverTrigger asChild>{buttonContent}</PopoverTrigger>
       <PopoverContent
         className={cn("p-0 z-50", compact ? "w-[95vw] max-w-[400px]" : "w-[360px]")}
         align={compact ? "center" : "start"}
@@ -319,15 +354,7 @@ function PriceFilter({ compact = false, onPopoverClose }: FilterComponentProps) 
             Price Range
           </div>
 
-          <Tabs
-            value={state.activePriceType}
-            onValueChange={(value) =>
-              updateFilters({
-                activePriceType: value as "total" | "sqm",
-              })
-            }
-            className="w-full"
-          >
+          <Tabs value={priceType} onValueChange={handleTabValueChange} className="w-full">
             <TabsList className={cn("w-full grid grid-cols-2", "h-[52px] p-1 bg-muted rounded-lg")}>
               <TabsTrigger
                 value="total"
@@ -367,7 +394,10 @@ function PriceFilter({ compact = false, onPopoverClose }: FilterComponentProps) 
               <TabsContent value="total" className="mt-0 space-y-4">
                 <div className="flex items-center gap-2">
                   <div className="w-full">
-                    <Select value={minPrice} onValueChange={setMinPrice}>
+                    <Select
+                      value={localMinPrice}
+                      onValueChange={(value) => handlePriceChange("minPrice", value)}
+                    >
                       <SelectTrigger
                         id="minPrice"
                         className="bg-background border border-input rounded-lg w-full h-11 text-sm md:text-base px-2 md:px-3"
@@ -375,7 +405,7 @@ function PriceFilter({ compact = false, onPopoverClose }: FilterComponentProps) 
                         <SelectValue placeholder="No Min" />
                       </SelectTrigger>
                       <SelectContent>
-                        {minPriceOptions.map((option) => (
+                        {priceOptions.minPriceOptions.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.label}
                           </SelectItem>
@@ -389,7 +419,10 @@ function PriceFilter({ compact = false, onPopoverClose }: FilterComponentProps) 
                   </div>
 
                   <div className="w-full">
-                    <Select value={maxPrice} onValueChange={setMaxPrice}>
+                    <Select
+                      value={localMaxPrice}
+                      onValueChange={(value) => handlePriceChange("maxPrice", value)}
+                    >
                       <SelectTrigger
                         id="maxPrice"
                         className="bg-background border border-input rounded-lg w-full h-11 text-sm md:text-base px-2 md:px-3"
@@ -397,7 +430,7 @@ function PriceFilter({ compact = false, onPopoverClose }: FilterComponentProps) 
                         <SelectValue placeholder="No Max" />
                       </SelectTrigger>
                       <SelectContent>
-                        {maxPriceOptions.map((option) => (
+                        {priceOptions.maxPriceOptions.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.label}
                           </SelectItem>
@@ -411,7 +444,10 @@ function PriceFilter({ compact = false, onPopoverClose }: FilterComponentProps) 
               <TabsContent value="sqm" className="mt-0 space-y-4">
                 <div className="flex items-center gap-2">
                   <div className="w-full">
-                    <Select value={minSqmPrice} onValueChange={setMinSqmPrice}>
+                    <Select
+                      value={localMinSqmPrice}
+                      onValueChange={(value) => handlePriceChange("minSqmPrice", value)}
+                    >
                       <SelectTrigger
                         id="minSqmPrice"
                         className="bg-background border border-input rounded-lg w-full h-11 text-sm md:text-base px-2 md:px-3"
@@ -433,7 +469,10 @@ function PriceFilter({ compact = false, onPopoverClose }: FilterComponentProps) 
                   </div>
 
                   <div className="w-full">
-                    <Select value={maxSqmPrice} onValueChange={setMaxSqmPrice}>
+                    <Select
+                      value={localMaxSqmPrice}
+                      onValueChange={(value) => handlePriceChange("maxSqmPrice", value)}
+                    >
                       <SelectTrigger
                         id="maxSqmPrice"
                         className="bg-background border border-input rounded-lg w-full h-11 text-sm md:text-base px-2 md:px-3"
@@ -456,12 +495,16 @@ function PriceFilter({ compact = false, onPopoverClose }: FilterComponentProps) 
         </div>
 
         <div className={cn("p-4 pt-6", compact ? "px-5 py-6" : "")}>
-          <div className="flex gap-2">
+          <div className="flex flex-row gap-2 w-full">
             <Button
               className="flex-1 bg-purple-600 hover:bg-purple-700 text-white text-base h-12 rounded-lg font-medium"
-              onClick={handleApply}
+              onClick={() => {
+                // Just close the popover, changes are already applied
+                setOpen(false);
+                onPopoverClose?.();
+              }}
             >
-              Apply
+              Close
             </Button>
             <Button variant="outline" className="h-12 rounded-lg" onClick={handleReset}>
               Reset
@@ -471,65 +514,72 @@ function PriceFilter({ compact = false, onPopoverClose }: FilterComponentProps) 
       </PopoverContent>
     </Popover>
   );
-}
+});
 
 // Listing Type Filter Component
-function ListingTypeFilter({
+const ListingTypeFilter = memo(function ListingTypeFilter({
   compact = false,
   disabled = false,
   onPopoverClose,
 }: FilterComponentProps) {
-  const { state, updateFilters } = useListingContext();
+  // Selective store access
+  const listingType = usePropertyFiltersStore((state) => state.filters.listingType);
+  const updateFilters = usePropertyFiltersStore((state) => state.updateFilters);
+
   const [open, setOpen] = useState(false);
 
-  // Handle selection of listing type
-  const handleSelectListingType = (value: ListingType) => {
-    console.log("Setting listing type to:", value);
+  // Handle selection of listing type - memoized callback
+  const handleSelectListingType = useCallback(
+    (value: ListingType) => {
+      // Update store (URL sync middleware will handle URL updates)
+      updateFilters({ listingType: value });
 
-    // Create a complete filter object with the new listing type
-    const completeFilters = {
-      ...getPropertyListingsFilter(state),
-      listingType: value,
-    };
+      // Close popover and notify parent
+      setOpen(false);
+      onPopoverClose?.();
+    },
+    [updateFilters, onPopoverClose]
+  );
 
-    // Only update context
-    updateFilters(completeFilters);
+  // Don't open popover if disabled - memoized callback
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (!disabled) {
+        setOpen(open);
+      }
+    },
+    [disabled]
+  );
 
-    // Close popover and notify parent
-    setOpen(false);
-    onPopoverClose?.();
-  };
+  // Memoize the button content
+  const buttonContent = useMemo(
+    () => (
+      <Button
+        variant="outline"
+        size={compact ? "sm" : undefined}
+        className={cn(
+          "flex items-center gap-1 text-foreground justify-between font-normal",
+          compact ? "h-9 whitespace-nowrap shrink-0 min-w-[110px]" : "h-10",
+          listingType === "buy" ? "min-w-[120px]" : "min-w-[120px]"
+        )}
+        disabled={disabled}
+      >
+        <span>{listingType === "buy" ? "For Sale" : "For Rent"}</span>
+        <ChevronDown className="h-4 w-4 opacity-50" />
+      </Button>
+    ),
+    [compact, disabled, listingType]
+  );
 
-  // Don't open popover if disabled
-  const handleOpenChange = (open: boolean) => {
-    if (!disabled) {
-      setOpen(open);
-    }
-  };
-
-  return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size={compact ? "sm" : undefined}
-          className={cn(
-            "flex items-center gap-1 text-foreground justify-between font-normal",
-            compact ? "h-9 whitespace-nowrap shrink-0 min-w-[110px]" : "h-10",
-            state.currentListingType === "buy" ? "min-w-[120px]" : "min-w-[120px]"
-          )}
-          disabled={disabled}
-        >
-          <span>{state.currentListingType === "buy" ? "For Sale" : "For Rent"}</span>
-          <ChevronDown className="h-4 w-4 opacity-50" />
-        </Button>
-      </PopoverTrigger>
+  // Memoize the PopoverContent
+  const popoverContent = useMemo(
+    () => (
       <PopoverContent className="w-[220px] p-0" align="start">
         <div className="p-1">
           {LISTING_TYPES.map((option) => (
             <Button
               key={option.id}
-              variant={state.currentListingType === option.value ? "default" : "ghost"}
+              variant={listingType === option.value ? "default" : "ghost"}
               className="w-full justify-start h-10 rounded-md mb-1 last:mb-0"
               onClick={() => handleSelectListingType(option.value as ListingType)}
             >
@@ -538,76 +588,87 @@ function ListingTypeFilter({
           ))}
         </div>
       </PopoverContent>
+    ),
+    [listingType, handleSelectListingType]
+  );
+
+  return (
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>{buttonContent}</PopoverTrigger>
+      {popoverContent}
     </Popover>
   );
-}
+});
 
 // Property Type Filter Component
-function PropertyTypeFilter({
+const PropertyTypeFilter = memo(function PropertyTypeFilter({
   compact = false,
   disabled = false,
   onPopoverClose,
 }: FilterComponentProps) {
-  const { state, updateFilters } = useListingContext();
+  // Selective store access
+  const propertyType = usePropertyFiltersStore((state) => state.filters.propertyType);
+  const updateFilters = usePropertyFiltersStore((state) => state.updateFilters);
+
   const [open, setOpen] = useState(false);
 
-  // Handle selection of property type
-  const handleSelectPropertyType = (value: PropertyType) => {
-    // Check if the property type is disabled
-    if (DISABLED_PROPERTY_TYPES.includes(value)) {
-      return; // Don't allow selection of disabled property types
-    }
+  // Handle selection of property type - memoized callback
+  const handleSelectPropertyType = useCallback(
+    (value: PropertyType) => {
+      // Check if the property type is disabled
+      if (DISABLED_PROPERTY_TYPES.includes(value)) {
+        return; // Don't allow selection of disabled property types
+      }
 
-    console.log("Setting property type to:", value);
+      // Update store (URL sync middleware will handle URL updates)
+      updateFilters({ propertyType: value });
 
-    // Create a complete filter object with the new property type
-    const completeFilters = {
-      ...getPropertyListingsFilter(state),
-      propertyType: value,
-    };
+      // Close popover and notify parent
+      setOpen(false);
+      onPopoverClose?.();
+    },
+    [updateFilters, onPopoverClose]
+  );
 
-    // Only update context
-    updateFilters(completeFilters);
+  // Don't open popover if disabled - memoized callback
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (!disabled) {
+        setOpen(open);
+      }
+    },
+    [disabled]
+  );
 
-    // Close popover and notify parent
-    setOpen(false);
-    onPopoverClose?.();
-  };
-
-  // Don't open popover if disabled
-  const handleOpenChange = (open: boolean) => {
-    if (!disabled) {
-      setOpen(open);
-    }
-  };
-
-  // Get display name for current property type
-  const getCurrentPropertyName = () => {
-    const currentOption = PROPERTY_TYPES.find(
-      (option) => option.value === state.currentPropertyType
-    );
+  // Get display name for current property type - memoized function
+  const getCurrentPropertyName = useCallback(() => {
+    const currentOption = PROPERTY_TYPES.find((option) => option.value === propertyType);
     return currentOption ? currentOption.name : "Property Type";
-  };
+  }, [propertyType]);
 
-  return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size={compact ? "sm" : undefined}
-          className={cn(
-            "flex items-center gap-1 text-foreground justify-between font-normal",
-            compact ? "h-9 whitespace-nowrap shrink-0 min-w-[120px]" : "h-10",
-            state.currentPropertyType === "vacant-lot" || state.currentPropertyType === "warehouse"
-              ? "min-w-[120px]"
-              : ""
-          )}
-          disabled={disabled}
-        >
-          <span>{getCurrentPropertyName()}</span>
-          <ChevronDown className="h-4 w-4 opacity-50" />
-        </Button>
-      </PopoverTrigger>
+  // Memoize the button content
+  const buttonContent = useMemo(
+    () => (
+      <Button
+        variant="outline"
+        size={compact ? "sm" : undefined}
+        className={cn(
+          "flex items-center gap-1 text-foreground justify-between font-normal",
+          compact ? "h-9 whitespace-nowrap shrink-0 min-w-[120px]" : "h-10",
+          propertyType === "vacant-lot" || propertyType === "warehouse" ? "min-w-[120px]" : ""
+        )}
+        disabled={disabled}
+      >
+        <span>{getCurrentPropertyName()}</span>
+        <ChevronDown className="h-4 w-4 opacity-50" />
+      </Button>
+    ),
+    [compact, disabled, propertyType, getCurrentPropertyName]
+  );
+
+  // Memoize the PopoverContent
+  const popoverContent = useMemo(
+    () => (
       <PopoverContent className="w-[220px] p-0" align="start">
         <div className="p-1">
           {PROPERTY_TYPES.map((option) => {
@@ -615,7 +676,7 @@ function PropertyTypeFilter({
             return (
               <Button
                 key={option.id}
-                variant={state.currentPropertyType === option.value ? "default" : "ghost"}
+                variant={propertyType === option.value ? "default" : "ghost"}
                 className={cn(
                   "w-full justify-start h-10 rounded-md mb-1 last:mb-0",
                   isDisabled && "opacity-50 cursor-not-allowed"
@@ -634,118 +695,120 @@ function PropertyTypeFilter({
           })}
         </div>
       </PopoverContent>
+    ),
+    [propertyType, handleSelectPropertyType]
+  );
+
+  return (
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>{buttonContent}</PopoverTrigger>
+      {popoverContent}
     </Popover>
   );
-}
+});
 
 // Area Filter Component
-function AreaFilter({ compact = false, onPopoverClose }: FilterComponentProps) {
-  const { state, updateFilters } = useListingContext();
+const AreaFilter = memo(function AreaFilter({
+  compact = false,
+  onPopoverClose,
+}: FilterComponentProps) {
+  // Selective store access
+  const minArea = usePropertyFiltersStore((state) => state.filters.minArea);
+  const maxArea = usePropertyFiltersStore((state) => state.filters.maxArea);
+  const propertyType = usePropertyFiltersStore((state) => state.filters.propertyType);
+  const updateFilters = usePropertyFiltersStore((state) => state.updateFilters);
+
   const [open, setOpen] = useState(false);
-  const [minArea, setMinArea] = useState(state.minArea?.toString() || "");
-  const [maxArea, setMaxArea] = useState(state.maxArea?.toString() || "");
+  const [localMinArea, setLocalMinArea] = useState(minArea?.toString() || "");
+  const [localMaxArea, setLocalMaxArea] = useState(maxArea?.toString() || "");
 
-  // Update local state when context state changes
+  // Update local state when store changes
   useEffect(() => {
-    setMinArea(state.minArea?.toString() || "");
-    setMaxArea(state.maxArea?.toString() || "");
-  }, [state.minArea, state.maxArea]);
+    setLocalMinArea(minArea?.toString() || "");
+    setLocalMaxArea(maxArea?.toString() || "");
+  }, [minArea, maxArea]);
 
-  // Reset area values
-  const handleReset = () => {
-    setMinArea("");
-    setMaxArea("");
+  // Reset area values - memoized callback
+  const handleReset = useCallback(() => {
+    console.log("🧹 Resetting area filter values");
 
-    // Update context with cleared values
-    updateFilters({
-      minArea: 0,
-      maxArea: 0,
-    });
+    // Reset local area inputs
+    setLocalMinArea("0");
+    setLocalMaxArea("0");
+
+    // Get the clearAllFilters function from useUrlSync
+    const { clearAllFilters } = useUrlSync();
+    clearAllFilters();
 
     // Close popover if needed
-    if (onPopoverClose) {
-      onPopoverClose();
-    }
-  };
+    setOpen(false);
+    onPopoverClose?.();
+  }, [onPopoverClose]);
 
-  // Apply filters and close popover
-  const handleApply = () => {
-    // Create the area updates object for context
-    const areaUpdates = {
-      minArea: minArea ? Number(minArea) : 0,
-      maxArea: maxArea ? Number(maxArea) : 0,
-    };
+  // Handle input changes - memoized callbacks
+  const handleMinAreaChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      setLocalMinArea(value);
 
-    // Before updating, prepare URL parameters
-    const urlParams: Record<string, string | number> = {};
+      // Immediately update the store
+      updateFilters({
+        minArea: value ? Number(value) : 0,
+      });
+    },
+    [updateFilters]
+  );
 
-    // Essential params - always include these
-    urlParams["listing-type"] = state.currentListingType === "rent" ? "for-rent" : "for-sale";
-    urlParams["property-type"] = state.currentPropertyType;
-    urlParams["price-type"] = state.activePriceType || "total";
+  const handleMaxAreaChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      setLocalMaxArea(value);
 
-    // Area specific parameters
-    if (minArea && Number(minArea) > 0) urlParams["min-area"] = Number(minArea);
-    if (maxArea && Number(maxArea) > 0) urlParams["max-area"] = Number(maxArea);
+      // Immediately update the store
+      updateFilters({
+        maxArea: value ? Number(value) : 0,
+      });
+    },
+    [updateFilters]
+  );
 
-    // Other existing parameters
-    if (state.location) urlParams.location = state.location;
-    if (state.minPrice && state.minPrice > 0) urlParams["min-price"] = state.minPrice;
-    if (state.maxPrice && state.maxPrice > 0) urlParams["max-price"] = state.maxPrice;
-    if (state.minSqmPrice && state.minSqmPrice > 0) urlParams["min-sqm-price"] = state.minSqmPrice;
-    if (state.maxSqmPrice && state.maxSqmPrice > 0) urlParams["max-sqm-price"] = state.maxSqmPrice;
-    if (state.minBedrooms && state.minBedrooms > 0) urlParams["min-bedrooms"] = state.minBedrooms;
-    if (state.minBathrooms && state.minBathrooms > 0)
-      urlParams["min-bathrooms"] = state.minBathrooms;
-
-    console.log("Setting URL params for area filters:", urlParams);
-
-    // First update URL params - Wrap in requestAnimationFrame to batch UI updates
-    // This prevents multiple quick re-renders
-    requestAnimationFrame(() => {
-      updateFilters(areaUpdates);
-
-      setOpen(false);
-
-      if (onPopoverClose) {
-        onPopoverClose();
-      }
-    });
-  };
-
-  // Get display text for the area button
-  const getAreaButtonText = () => {
-    const minValue = parseInt(minArea, 10) || 0;
-    const maxValue = parseInt(maxArea, 10) || 0;
+  // Get display text for the area button - memoized function
+  const getAreaButtonText = useCallback(() => {
+    const minValue = parseInt(localMinArea, 10) || 0;
+    const maxValue = parseInt(localMaxArea, 10) || 0;
 
     if (minValue === 0 && maxValue === 0) return "Area";
     if (minValue > 0 && maxValue === 0) return `${minValue}+ sqm`;
     if (minValue === 0 && maxValue > 0) return `Up to ${maxValue} sqm`;
     if (minValue === maxValue) return `${minValue} sqm`;
     return `${minValue} - ${maxValue} sqm`;
-  };
+  }, [localMinArea, localMaxArea]);
+
+  // Memoize the button content
+  const buttonContent = useMemo(
+    () => (
+      <Button
+        variant="outline"
+        size={compact ? "sm" : undefined}
+        className={cn(
+          "flex items-center gap-1 text-foreground justify-between font-normal",
+          compact ? "h-9 whitespace-nowrap shrink-0 min-w-[100px]" : "h-10",
+          propertyType === "vacant-lot" || propertyType === "warehouse" ? "min-w-[120px]" : ""
+        )}
+      >
+        <span className="truncate max-w-[85%] text-left">{getAreaButtonText()}</span>
+        <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+      </Button>
+    ),
+    [compact, propertyType, getAreaButtonText]
+  );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size={compact ? "sm" : undefined}
-          className={cn(
-            "flex items-center gap-1 text-foreground justify-between font-normal",
-            compact ? "h-9 whitespace-nowrap shrink-0 min-w-[100px]" : "h-10",
-            state.currentPropertyType === "vacant-lot" || state.currentPropertyType === "warehouse"
-              ? "min-w-[120px]"
-              : ""
-          )}
-        >
-          <span className="truncate max-w-[85%] text-left">{getAreaButtonText()}</span>
-          <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
-        </Button>
-      </PopoverTrigger>
+      <PopoverTrigger asChild>{buttonContent}</PopoverTrigger>
       <PopoverContent
         className={cn("p-0 z-50", compact ? "w-[95vw] max-w-[400px]" : "w-[320px]")}
-        align="start"
+        align={compact ? "center" : "start"}
         side="bottom"
         alignOffset={0}
         sideOffset={16}
@@ -776,8 +839,8 @@ function AreaFilter({ compact = false, onPopoverClose }: FilterComponentProps) {
                 id="minArea"
                 type="number"
                 placeholder="Min area"
-                value={minArea}
-                onChange={(e) => setMinArea(e.target.value)}
+                value={localMinArea}
+                onChange={handleMinAreaChange}
                 className="h-10 text-sm md:text-base bg-background border border-input rounded-lg px-3"
               />
             </div>
@@ -791,23 +854,31 @@ function AreaFilter({ compact = false, onPopoverClose }: FilterComponentProps) {
                 id="maxArea"
                 type="number"
                 placeholder="Max area"
-                value={maxArea}
-                onChange={(e) => setMaxArea(e.target.value)}
+                value={localMaxArea}
+                onChange={handleMaxAreaChange}
                 className="h-10 text-sm md:text-base bg-background border border-input rounded-lg px-3"
               />
             </div>
           </div>
         </div>
 
-        <div className="p-4 pt-6">
-          <div className="flex gap-2">
+        <div className={cn("p-4 pt-6", compact ? "px-5 py-6" : "")}>
+          <div className="flex flex-row gap-2 w-full">
             <Button
               className="flex-1 bg-purple-600 hover:bg-purple-700 text-white text-base h-12 rounded-lg font-medium"
-              onClick={handleApply}
+              onClick={() => {
+                // Just close the popover, changes are already applied
+                setOpen(false);
+                onPopoverClose?.();
+              }}
             >
-              Apply
+              Close
             </Button>
-            <Button variant="outline" className="h-12 rounded-lg" onClick={handleReset}>
+            <Button
+              variant="outline"
+              className="h-12 rounded-lg flex-shrink-0"
+              onClick={handleReset}
+            >
               Reset
             </Button>
           </div>
@@ -815,63 +886,93 @@ function AreaFilter({ compact = false, onPopoverClose }: FilterComponentProps) {
       </PopoverContent>
     </Popover>
   );
-}
+});
 
 // Bedrooms Filter Component
-function BedroomsFilter({
+const BedroomsFilter = memo(function BedroomsFilter({
   compact = false,
   disabled = false,
   onPopoverClose,
 }: FilterComponentProps) {
-  const { state, updateFilters } = useListingContext();
+  // Selective store access
+  const minBedrooms = usePropertyFiltersStore((state) => state.filters.minBedrooms);
+  const propertyType = usePropertyFiltersStore((state) => state.filters.propertyType);
+  const updateFilters = usePropertyFiltersStore((state) => state.updateFilters);
+
   const [open, setOpen] = useState(false);
 
-  // Handle selection of minimum bedrooms
-  const handleSelect = (value: string) => {
-    // Create the update
-    const update = { minBedrooms: Number(value) };
+  // Handle selection of minimum bedrooms - memoized callback
+  const handleSelect = useCallback(
+    (value: string) => {
+      const numValue = Number(value);
+      console.log(`🛏️ Setting minBedrooms to ${numValue}`, { value, numValue });
 
-    // Update context
-    updateFilters(update);
+      // Update store (URL sync middleware will handle URL updates)
+      updateFilters({ minBedrooms: numValue });
 
-    // Close popover and notify parent
-    setOpen(false);
-    onPopoverClose?.();
-  };
+      // Log when "Any" (0) is selected to track URL updates
+      if (numValue === 0) {
+        console.log("📌 Selected 'Any' for bedrooms - this should be excluded from URL params");
 
-  // Don't open popover if disabled
-  const handleOpenChange = (open: boolean) => {
-    if (!disabled) {
-      setOpen(open);
-    }
-  };
+        // Add a small delay to let the store update first
+        setTimeout(() => {
+          const currentParams = new URLSearchParams(window.location.search);
+          console.log(
+            "📌 Current URL params after selecting 'Any':",
+            Object.fromEntries(currentParams.entries()),
+            "Has bedrooms param:",
+            currentParams.has("bedrooms")
+          );
+        }, 500);
+      }
 
-  // Get display text for the bedrooms button
-  const getButtonText = () => {
-    const minBedrooms = state.minBedrooms || 0;
-    if (minBedrooms === 0) return "Bedrooms";
-    return `${minBedrooms}+ Bedrooms`;
-  };
+      // Close popover and notify parent
+      setOpen(false);
+      onPopoverClose?.();
+    },
+    [updateFilters, onPopoverClose]
+  );
 
-  return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size={compact ? "sm" : undefined}
-          className={cn(
-            "flex items-center gap-1 text-foreground justify-between font-normal",
-            compact ? "h-9 whitespace-nowrap shrink-0 min-w-[100px]" : "h-10",
-            state.currentPropertyType === "vacant-lot" || state.currentPropertyType === "warehouse"
-              ? "min-w-[120px]"
-              : ""
-          )}
-          disabled={disabled}
-        >
-          <span className="truncate max-w-[85%] text-left">{getButtonText()}</span>
-          <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
-        </Button>
-      </PopoverTrigger>
+  // Don't open popover if disabled - memoized callback
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (!disabled) {
+        setOpen(open);
+      }
+    },
+    [disabled]
+  );
+
+  // Get display text for the bedrooms button - memoized function
+  const getButtonText = useCallback(() => {
+    const bedroomsValue = minBedrooms || 0;
+    if (bedroomsValue === 0) return "Bedrooms";
+    return `${bedroomsValue}+ Bedrooms`;
+  }, [minBedrooms]);
+
+  // Memoize the button content
+  const buttonContent = useMemo(
+    () => (
+      <Button
+        variant="outline"
+        size={compact ? "sm" : undefined}
+        className={cn(
+          "flex items-center gap-1 text-foreground justify-between font-normal",
+          compact ? "h-9 whitespace-nowrap shrink-0 min-w-[100px]" : "h-10",
+          propertyType === "vacant-lot" || propertyType === "warehouse" ? "min-w-[120px]" : ""
+        )}
+        disabled={disabled}
+      >
+        <span className="truncate max-w-[85%] text-left">{getButtonText()}</span>
+        <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+      </Button>
+    ),
+    [compact, disabled, propertyType, getButtonText]
+  );
+
+  // Memoize the PopoverContent
+  const popoverContent = useMemo(
+    () => (
       <PopoverContent
         className="p-0 z-50 w-[220px]"
         align="start"
@@ -888,7 +989,7 @@ function BedroomsFilter({
             {[0, 1, 2, 3, 4, 5].map((num) => (
               <Button
                 key={num}
-                variant={state.minBedrooms === num ? "default" : "ghost"}
+                variant={minBedrooms === num ? "default" : "ghost"}
                 className="w-full justify-start h-10 rounded-md"
                 onClick={() => handleSelect(num.toString())}
               >
@@ -898,65 +999,87 @@ function BedroomsFilter({
           </div>
         </div>
       </PopoverContent>
+    ),
+    [minBedrooms, handleSelect]
+  );
+
+  return (
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>{buttonContent}</PopoverTrigger>
+      {popoverContent}
     </Popover>
   );
-}
+});
 
 // Bathrooms Filter Component
-function BathroomsFilter({
+const BathroomsFilter = memo(function BathroomsFilter({
   compact = false,
   disabled = false,
   onPopoverClose,
 }: FilterComponentProps) {
-  const { state, updateFilters } = useListingContext();
+  // Selective store access
+  const minBathrooms = usePropertyFiltersStore((state) => state.filters.minBathrooms);
+  const propertyType = usePropertyFiltersStore((state) => state.filters.propertyType);
+  const updateFilters = usePropertyFiltersStore((state) => state.updateFilters);
+
   const [open, setOpen] = useState(false);
 
-  // Handle selection of minimum bathrooms
-  const handleSelect = (value: string) => {
-    // Create the update
-    const update = { minBathrooms: Number(value) };
+  // Handle selection of minimum bathrooms - memoized callback
+  const handleSelect = useCallback(
+    (value: string) => {
+      const numValue = Number(value);
+      console.log(`🚿 Setting minBathrooms to ${numValue}`, { value, numValue });
 
-    // Update context
-    updateFilters(update);
+      // Update store (URL sync middleware will handle URL updates)
+      updateFilters({ minBathrooms: numValue });
 
-    // Close popover and notify parent
-    setOpen(false);
-    onPopoverClose?.();
-  };
+      // Close popover and notify parent
+      setOpen(false);
+      onPopoverClose?.();
+    },
+    [updateFilters, onPopoverClose]
+  );
 
-  // Don't open popover if disabled
-  const handleOpenChange = (open: boolean) => {
-    if (!disabled) {
-      setOpen(open);
-    }
-  };
+  // Don't open popover if disabled - memoized callback
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (!disabled) {
+        setOpen(open);
+      }
+    },
+    [disabled]
+  );
 
-  // Get display text for the bathrooms button
-  const getButtonText = () => {
-    const minBathrooms = state.minBathrooms || 0;
-    if (minBathrooms === 0) return "Bathrooms";
-    return `${minBathrooms}+ Bathrooms`;
-  };
+  // Get display text for the bathrooms button - memoized function
+  const getButtonText = useCallback(() => {
+    const bathroomsValue = minBathrooms || 0;
+    if (bathroomsValue === 0) return "Bathrooms";
+    return `${bathroomsValue}+ Bathrooms`;
+  }, [minBathrooms]);
 
-  return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size={compact ? "sm" : undefined}
-          className={cn(
-            "flex items-center gap-1 text-foreground justify-between font-normal",
-            compact ? "h-9 whitespace-nowrap shrink-0 min-w-[100px]" : "h-10",
-            state.currentPropertyType === "vacant-lot" || state.currentPropertyType === "warehouse"
-              ? "min-w-[120px]"
-              : ""
-          )}
-          disabled={disabled}
-        >
-          <span className="truncate max-w-[85%] text-left">{getButtonText()}</span>
-          <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
-        </Button>
-      </PopoverTrigger>
+  // Memoize the button content
+  const buttonContent = useMemo(
+    () => (
+      <Button
+        variant="outline"
+        size={compact ? "sm" : undefined}
+        className={cn(
+          "flex items-center gap-1 text-foreground justify-between font-normal",
+          compact ? "h-9 whitespace-nowrap shrink-0 min-w-[100px]" : "h-10",
+          propertyType === "vacant-lot" || propertyType === "warehouse" ? "min-w-[120px]" : ""
+        )}
+        disabled={disabled}
+      >
+        <span className="truncate max-w-[85%] text-left">{getButtonText()}</span>
+        <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+      </Button>
+    ),
+    [compact, disabled, propertyType, getButtonText]
+  );
+
+  // Memoize the PopoverContent
+  const popoverContent = useMemo(
+    () => (
       <PopoverContent
         className="p-0 z-50 w-[220px]"
         align="start"
@@ -973,7 +1096,7 @@ function BathroomsFilter({
             {[0, 1, 2, 3, 4, 5].map((num) => (
               <Button
                 key={num}
-                variant={state.minBathrooms === num ? "default" : "ghost"}
+                variant={minBathrooms === num ? "default" : "ghost"}
                 className="w-full justify-start h-10 rounded-md"
                 onClick={() => handleSelect(num.toString())}
               >
@@ -983,8 +1106,38 @@ function BathroomsFilter({
           </div>
         </div>
       </PopoverContent>
+    ),
+    [minBathrooms, handleSelect]
+  );
+
+  return (
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>{buttonContent}</PopoverTrigger>
+      {popoverContent}
     </Popover>
   );
+});
+
+// Equivalent function to getPropertyListingsFilter from the old listing provider
+function createPropertyListingsFilter(
+  filterState: PropertyFiltersState["filters"]
+): PropertyListingsFilter {
+  return {
+    listingType: filterState.listingType,
+    propertyType: filterState.propertyType,
+    location: filterState.location || "",
+    minPrice: filterState.minPrice,
+    maxPrice: filterState.maxPrice,
+    minSqmPrice: filterState.minSqmPrice,
+    maxSqmPrice: filterState.maxSqmPrice,
+    activePriceType: filterState.activePriceType,
+    minBedrooms: filterState.minBedrooms,
+    minBathrooms: filterState.minBathrooms,
+    minArea: filterState.minArea,
+    maxArea: filterState.maxArea,
+    sortField: filterState.sortField,
+    sortOrder: filterState.sortOrder,
+  };
 }
 
 /**
@@ -998,111 +1151,127 @@ export function PropertyFilters({
   displayStyle = "standard",
   ...props
 }: PropertyFiltersProps) {
-  const { state, updateFilters, resetFilters } = useListingContext();
+  // Selective store access
+  const filters = usePropertyFiltersStore((state) => state.filters);
+  const updateFilters = usePropertyFiltersStore((state) => state.updateFilters);
+
+  // Initialize URL sync for direct access to clearAllFilters
+  const { clearAllFilters } = useUrlSync();
+
   const [initialLoad, setInitialLoad] = useState(true);
-  const [locationInput, setLocationInput] = useState(state.location || "");
+  const [locationInput, setLocationInput] = useState(filters.location || "");
+  const searchParams = useSearchParams();
 
-  // Check if property type should have bedroom/bathroom filters disabled
-  const shouldDisableRoomFilters =
-    state.currentPropertyType === "vacant-lot" || state.currentPropertyType === "warehouse";
+  // Debug effect - log when filters change
+  useEffect(() => {
+    console.log("🔍 PropertyFilters component - Current filters:", filters);
+  }, [filters]);
 
-  // Initialize filters from initial filters
+  // Check if property type should have bedroom/bathroom filters disabled - memoized
+  const shouldDisableRoomFilters = useMemo(
+    () => filters.propertyType === "vacant-lot" || filters.propertyType === "warehouse",
+    [filters.propertyType]
+  );
+
+  // Initialize filters from initial filters or URL - run only once
   useEffect(() => {
     if (initialLoad) {
-      // Just apply initial filters directly
-      updateFilters(initialFilters);
+      const urlParams = new URLSearchParams(searchParams.toString());
+
+      // Only apply initialFilters if there are no URL parameters
+      // This ensures URL params take precedence on page reload
+      if (urlParams.toString() === "") {
+        // No URL params, apply initial filters
+        updateFilters(initialFilters);
+      }
+
       setInitialLoad(false);
     }
-  }, [initialLoad, initialFilters, updateFilters]);
+  }, [initialLoad, initialFilters, updateFilters, searchParams]);
 
-  // Update local state when context changes
+  // Update local state when location store changes
   useEffect(() => {
-    setLocationInput(state.location || "");
-  }, [state.location]);
+    setLocationInput(filters.location || "");
+  }, [filters.location]);
 
-  // Debounce the location updates to prevent lag
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      // Only update context if the input differs from current state
-      if (locationInput !== state.location) {
-        // Update context with debounced value
-        updateFilters({ location: locationInput });
-      }
-    }, 300); // 300ms debounce
+  // Debounced location update function - using debounce utility
+  const debouncedLocationUpdate = useCallback(
+    debounce((value: string) => {
+      updateFilters({ location: value });
+    }, 300),
+    [updateFilters]
+  );
 
-    return () => clearTimeout(timer);
-  }, [locationInput, updateFilters, state.location]);
+  // Handle form submission - memoized callback
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      // Get filters from state and ensure required fields are provided
+      const filtersWithLocation = {
+        ...createPropertyListingsFilter(filters),
+        location: filters.location || "",
+      };
+      onApplyFilters(filtersWithLocation);
+    },
+    [filters, onApplyFilters]
+  );
 
-  // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Get filters from state and ensure required fields are provided
-    const stateFilters = getPropertyListingsFilter(state);
-    const filters: PropertyListingsFilter = {
-      ...stateFilters,
-      // Ensure location is never undefined
-      location: stateFilters.location || "",
-    };
+  // Handle form reset - memoized callback
+  const handleReset = useCallback(() => {
+    console.log("🧹 Resetting all filters");
 
-    // Prevent multiple rapid filter applications by using requestAnimationFrame
-    // This batches DOM updates and React state changes for smoother UI
-    requestAnimationFrame(() => {
-      // Only notify parent component
-      onApplyFilters(filters);
-    });
-  };
+    // Use clearAllFilters for one-click reset
+    clearAllFilters();
 
-  // Handle form reset
-  const handleReset = () => {
-    // Reset the context
-    resetFilters();
     // Reset local state
     setLocationInput("");
 
-    // Create a complete default filter object
-    const defaultFilters: PropertyListingsFilter = {
+    // Notify parent component with default filters
+    onApplyFilters({
       ...DEFAULT_FILTERS,
-      listingType: "buy",
-      propertyType: "condominium",
-      location: "",
-      minPrice: 0,
-      maxPrice: 0,
-      minSqmPrice: 0,
-      maxSqmPrice: 0,
-      activePriceType: "total",
-      minBedrooms: 0,
-      minBathrooms: 0,
-      minArea: 0,
-      maxArea: 0,
+    });
+  }, [clearAllFilters, onApplyFilters]);
+
+  // Handle location change - memoized callback
+  const handleLocationChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      // Update local state immediately for responsive UI
+      setLocationInput(value);
+      // Debounce the store update to prevent lag
+      debouncedLocationUpdate(value);
+    },
+    [debouncedLocationUpdate]
+  );
+
+  // Handle filter apply for popover components - memoized callback
+  const handleFilterApply = useCallback(() => {
+    // Get filters and ensure location is never undefined
+    const filtersWithLocation = {
+      ...createPropertyListingsFilter(filters),
+      location: filters.location || "",
     };
+    onApplyFilters(filtersWithLocation);
+  }, [filters, onApplyFilters]);
 
-    // Notify parent component
-    onApplyFilters(defaultFilters);
-  };
+  // Handle tab change callback - memoized
+  const handleTabValueChange = useCallback(
+    (value: string) => {
+      updateFilters({
+        activePriceType: value as "total" | "sqm",
+      });
+    },
+    [updateFilters]
+  );
 
-  // Handle location change
-  const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Only update local state (debounced update will happen in useEffect)
-    setLocationInput(e.target.value);
-  };
+  // Callback for filter popover close - memoized
+  const getPopoverCloseHandler = useCallback(() => {
+    return handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+  }, [handleSubmit]);
 
-  // Handle filter apply for popover components
-  const handleFilterApply = () => {
-    // Get filters from state and ensure required fields are provided
-    const stateFilters = getPropertyListingsFilter(state);
-    const filters: PropertyListingsFilter = {
-      ...stateFilters,
-      // Ensure location is never undefined
-      location: stateFilters.location || "",
-    };
-
-    // Notify parent component
-    onApplyFilters(filters);
-  };
-
-  // Render compact mobile view
-  if (displayStyle === "compact") {
-    return (
+  // Memoize compact layout - call unconditionally
+  const compactLayout = useMemo(
+    () => (
       <div className={cn("w-full overflow-x-visible", className)} {...props}>
         {/* Horizontally scrollable filter area */}
         <div className="relative w-full">
@@ -1114,65 +1283,32 @@ export function PropertyFilters({
               msOverflowStyle: "none",
             }}
           >
-            <ListingTypeFilter
-              compact
-              onPopoverClose={() => {
-                handleFilterApply();
-              }}
-            />
-
-            {/* Property Type Filter */}
-            <PropertyTypeFilter
-              compact
-              onPopoverClose={() => {
-                handleFilterApply();
-              }}
-            />
-
-            {/* Area Filter */}
-            <AreaFilter
-              compact
-              onPopoverClose={() => {
-                handleFilterApply();
-              }}
-            />
-
-            <PriceFilter
-              compact
-              onPopoverClose={() => {
-                handleFilterApply();
-              }}
-            />
-
-            {/* Bedrooms Filter */}
+            <ListingTypeFilter compact onPopoverClose={handleFilterApply} />
+            <PropertyTypeFilter compact onPopoverClose={handleFilterApply} />
+            <AreaFilter compact onPopoverClose={handleFilterApply} />
+            <PriceFilter compact onPopoverClose={handleFilterApply} />
             <BedroomsFilter
               compact
-              onPopoverClose={() => {
-                handleFilterApply();
-              }}
+              onPopoverClose={handleFilterApply}
               disabled={shouldDisableRoomFilters}
             />
-
-            {/* Bathrooms Filter */}
             <BathroomsFilter
               compact
-              onPopoverClose={() => {
-                handleFilterApply();
-              }}
+              onPopoverClose={handleFilterApply}
               disabled={shouldDisableRoomFilters}
             />
           </div>
-
           {/* Subtle fade effect on the right edge to indicate scrollability */}
           <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-background to-transparent pointer-events-none"></div>
         </div>
       </div>
-    );
-  }
+    ),
+    [className, props, handleFilterApply, shouldDisableRoomFilters]
+  );
 
-  // Render horizontal layout for desktop nav
-  if (displayStyle === "horizontal") {
-    return (
+  // Memoize horizontal layout - call unconditionally
+  const horizontalLayout = useMemo(
+    () => (
       <form onSubmit={handleSubmit} className={cn("w-full", className)} {...props}>
         <div className="flex flex-wrap items-center gap-2">
           {/* Search Input */}
@@ -1186,35 +1322,17 @@ export function PropertyFilters({
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           </div>
 
-          {/* Listing Type Filter */}
-          <ListingTypeFilter
-            onPopoverClose={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
-          />
-
-          {/* Property Type Filter */}
-          <PropertyTypeFilter
-            onPopoverClose={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
-          />
-
-          {/* Area Filter */}
-          <AreaFilter
-            onPopoverClose={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
-          />
-
-          {/* Price Filter */}
-          <PriceFilter
-            onPopoverClose={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
-          />
-
-          {/* Bedrooms Filter */}
+          {/* Filter Components */}
+          <ListingTypeFilter onPopoverClose={getPopoverCloseHandler} />
+          <PropertyTypeFilter onPopoverClose={getPopoverCloseHandler} />
+          <AreaFilter onPopoverClose={getPopoverCloseHandler} />
+          <PriceFilter onPopoverClose={getPopoverCloseHandler} />
           <BedroomsFilter
-            onPopoverClose={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
+            onPopoverClose={getPopoverCloseHandler}
             disabled={shouldDisableRoomFilters}
           />
-
-          {/* Bathrooms Filter */}
           <BathroomsFilter
-            onPopoverClose={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
+            onPopoverClose={getPopoverCloseHandler}
             disabled={shouldDisableRoomFilters}
           />
 
@@ -1224,175 +1342,198 @@ export function PropertyFilters({
           </Button>
         </div>
       </form>
-    );
+    ),
+    [
+      className,
+      props,
+      handleSubmit,
+      locationInput,
+      handleLocationChange,
+      getPopoverCloseHandler,
+      shouldDisableRoomFilters,
+      isLoading,
+    ]
+  );
+
+  // Memoize standard layout - call unconditionally
+  const standardLayout = useMemo(
+    () => (
+      <div className={cn("p-6 border rounded-lg space-y-6 bg-card", className)} {...props}>
+        <form onSubmit={handleSubmit}>
+          {/* Listing Type */}
+          <div className="space-y-2">
+            <Label htmlFor="listingType">Listing Type</Label>
+            <ListingTypeFilter onPopoverClose={getPopoverCloseHandler} />
+          </div>
+
+          {/* Property Type */}
+          <div className="space-y-2 mt-4">
+            <Label htmlFor="propertyType">Property Type</Label>
+            <PropertyTypeFilter onPopoverClose={getPopoverCloseHandler} />
+          </div>
+
+          {/* Location */}
+          <div className="space-y-2 mt-4">
+            <Label htmlFor="location">Location</Label>
+            <div className="relative">
+              <Input
+                id="location"
+                placeholder="Enter location"
+                value={locationInput}
+                onChange={handleLocationChange}
+                disabled={isLoading}
+                className="pl-10 h-10"
+              />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            </div>
+          </div>
+
+          {/* Price Range */}
+          <div className="space-y-2 mt-4">
+            <Label>Price Range</Label>
+            <Tabs
+              value={filters.activePriceType}
+              onValueChange={handleTabValueChange}
+              className="w-full"
+            >
+              <TabsList className="w-full grid grid-cols-2">
+                <TabsTrigger value="total">Total Price</TabsTrigger>
+                <TabsTrigger value="sqm">Per SQM</TabsTrigger>
+              </TabsList>
+              <TabsContent value="total" className="pt-2">
+                <div className="grid gap-4 grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="minPrice">Min Price</Label>
+                    <Input
+                      id="minPrice"
+                      type="number"
+                      placeholder="Min price"
+                      value={filters.minPrice || ""}
+                      onChange={(e) =>
+                        updateFilters({
+                          minPrice: Number(e.target.value),
+                        })
+                      }
+                      disabled={isLoading}
+                      className="h-10"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="maxPrice">Max Price</Label>
+                    <Input
+                      id="maxPrice"
+                      type="number"
+                      placeholder="Max price"
+                      value={filters.maxPrice || ""}
+                      onChange={(e) =>
+                        updateFilters({
+                          maxPrice: Number(e.target.value),
+                        })
+                      }
+                      disabled={isLoading}
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+              <TabsContent value="sqm" className="pt-2">
+                <div className="grid gap-4 grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="minSqmPrice">Min ₱/sqm</Label>
+                    <Input
+                      id="minSqmPrice"
+                      type="number"
+                      placeholder="Min price per sqm"
+                      value={filters.minSqmPrice || ""}
+                      onChange={(e) =>
+                        updateFilters({
+                          minSqmPrice: Number(e.target.value),
+                        })
+                      }
+                      disabled={isLoading}
+                      className="h-10"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="maxSqmPrice">Max ₱/sqm</Label>
+                    <Input
+                      id="maxSqmPrice"
+                      type="number"
+                      placeholder="Max price per sqm"
+                      value={filters.maxSqmPrice || ""}
+                      onChange={(e) =>
+                        updateFilters({
+                          maxSqmPrice: Number(e.target.value),
+                        })
+                      }
+                      disabled={isLoading}
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          {/* Bedroom/Bathroom/Area Filters */}
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="minBedrooms">Min Bedrooms</Label>
+              <BedroomsFilter onPopoverClose={getPopoverCloseHandler} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="minBathrooms">Min Bathrooms</Label>
+              <BathroomsFilter onPopoverClose={getPopoverCloseHandler} />
+            </div>
+          </div>
+
+          {/* Area Range */}
+          <div className="space-y-2 mt-4">
+            <Label>Area Range (sqm)</Label>
+            <AreaFilter onPopoverClose={getPopoverCloseHandler} />
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-4 mt-6">
+            <LoadingButton
+              type="submit"
+              className="flex-1"
+              isLoading={isLoading}
+              loadingText="Applying..."
+            >
+              Apply Filters
+            </LoadingButton>
+            <Button type="button" variant="outline" onClick={handleReset} disabled={isLoading}>
+              Reset
+            </Button>
+          </div>
+        </form>
+      </div>
+    ),
+    [
+      className,
+      props,
+      handleSubmit,
+      getPopoverCloseHandler,
+      locationInput,
+      handleLocationChange,
+      filters,
+      handleTabValueChange,
+      updateFilters,
+      isLoading,
+      handleReset,
+    ]
+  );
+
+  // Conditionally return the appropriate layout
+  if (displayStyle === "compact") {
+    return compactLayout;
   }
 
-  // Standard vertical layout
-  return (
-    <div className={cn("p-6 border rounded-lg space-y-6 bg-card", className)} {...props}>
-      <form onSubmit={handleSubmit}>
-        {/* Listing Type */}
-        <div className="space-y-2">
-          <Label htmlFor="listingType">Listing Type</Label>
-          <ListingTypeFilter
-            onPopoverClose={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
-          />
-        </div>
+  if (displayStyle === "horizontal") {
+    return horizontalLayout;
+  }
 
-        {/* Property Type */}
-        <div className="space-y-2 mt-4">
-          <Label htmlFor="propertyType">Property Type</Label>
-          <PropertyTypeFilter
-            onPopoverClose={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
-          />
-        </div>
-
-        {/* Location */}
-        <div className="space-y-2 mt-4">
-          <Label htmlFor="location">Location</Label>
-          <div className="relative">
-            <Input
-              id="location"
-              placeholder="Enter location"
-              value={locationInput}
-              onChange={handleLocationChange}
-              disabled={isLoading}
-              className="pl-10 h-10"
-            />
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-          </div>
-        </div>
-
-        {/* Price Range */}
-        <div className="space-y-2 mt-4">
-          <Label>Price Range</Label>
-          <Tabs
-            value={state.activePriceType}
-            onValueChange={(value) =>
-              updateFilters({
-                activePriceType: value as "total" | "sqm",
-              })
-            }
-            className="w-full"
-          >
-            <TabsList className="w-full grid grid-cols-2">
-              <TabsTrigger value="total">Total Price</TabsTrigger>
-              <TabsTrigger value="sqm">Per SQM</TabsTrigger>
-            </TabsList>
-            <TabsContent value="total" className="pt-2">
-              <div className="grid gap-4 grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="minPrice">Min Price</Label>
-                  <Input
-                    id="minPrice"
-                    type="number"
-                    placeholder="Min price"
-                    value={state.minPrice || ""}
-                    onChange={(e) =>
-                      updateFilters({
-                        minPrice: Number(e.target.value),
-                      })
-                    }
-                    disabled={isLoading}
-                    className="h-10"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="maxPrice">Max Price</Label>
-                  <Input
-                    id="maxPrice"
-                    type="number"
-                    placeholder="Max price"
-                    value={state.maxPrice || ""}
-                    onChange={(e) =>
-                      updateFilters({
-                        maxPrice: Number(e.target.value),
-                      })
-                    }
-                    disabled={isLoading}
-                    className="h-10"
-                  />
-                </div>
-              </div>
-            </TabsContent>
-            <TabsContent value="sqm" className="pt-2">
-              <div className="grid gap-4 grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="minSqmPrice">Min ₱/sqm</Label>
-                  <Input
-                    id="minSqmPrice"
-                    type="number"
-                    placeholder="Min price per sqm"
-                    value={state.minSqmPrice || ""}
-                    onChange={(e) =>
-                      updateFilters({
-                        minSqmPrice: Number(e.target.value),
-                      })
-                    }
-                    disabled={isLoading}
-                    className="h-10"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="maxSqmPrice">Max ₱/sqm</Label>
-                  <Input
-                    id="maxSqmPrice"
-                    type="number"
-                    placeholder="Max price per sqm"
-                    value={state.maxSqmPrice || ""}
-                    onChange={(e) =>
-                      updateFilters({
-                        maxSqmPrice: Number(e.target.value),
-                      })
-                    }
-                    disabled={isLoading}
-                    className="h-10"
-                  />
-                </div>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </div>
-
-        {/* Bedroom/Bathroom/Area Filters */}
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 mt-4">
-          <div className="space-y-2">
-            <Label htmlFor="minBedrooms">Min Bedrooms</Label>
-            <BedroomsFilter
-              onPopoverClose={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="minBathrooms">Min Bathrooms</Label>
-            <BathroomsFilter
-              onPopoverClose={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
-            />
-          </div>
-        </div>
-
-        {/* Area Range */}
-        <div className="space-y-2 mt-4">
-          <Label>Area Range (sqm)</Label>
-          <AreaFilter
-            onPopoverClose={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
-          />
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-4 mt-6">
-          <LoadingButton
-            type="submit"
-            className="flex-1"
-            isLoading={isLoading}
-            loadingText="Applying..."
-          >
-            Apply Filters
-          </LoadingButton>
-          <Button type="button" variant="outline" onClick={handleReset} disabled={isLoading}>
-            Reset
-          </Button>
-        </div>
-      </form>
-    </div>
-  );
+  // Default to standard layout
+  return standardLayout;
 }

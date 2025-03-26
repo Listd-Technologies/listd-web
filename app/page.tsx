@@ -1,7 +1,7 @@
-import { FeaturesSection } from "@/components/homepage-sections/features-section";
-import { HeroSection } from "@/components/homepage-sections/hero-section";
-import { LandlordSection } from "@/components/homepage-sections/landlord-section";
-import { ValuationSection } from "@/components/homepage-sections/valuation-section";
+import { FeaturesSection } from "@/components/homepage/features-section";
+import { HeroSection } from "@/components/homepage/hero-section";
+import { LandlordSection } from "@/components/homepage/landlord-section";
+import { ValuationSection } from "@/components/homepage/valuation-section";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {

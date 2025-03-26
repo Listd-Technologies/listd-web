@@ -3,21 +3,20 @@
 import { allProperties } from "@/components/listings/property-cards/sample-properties";
 import { PropertyFilters } from "@/components/listings/property-filters";
 import { PropertyListingGrid } from "@/components/listings/property-listing-grid";
-import { PropertyType } from "@/components/providers/listing-provider";
-import { useMapContext } from "@/components/providers/map-context-provider";
 import { Button } from "@/components/ui/button";
 import { getPropertyAdapter } from "@/hooks/api/adapters/property-adapter-factory";
 import { type PropertyListingsFilter } from "@/hooks/api/usePropertyListings";
 import { useProperties as usePropertiesV1 } from "@/hooks/api/v1";
 import { usePropertyFilters } from "@/hooks/usePropertyFilters";
 import { cn } from "@/lib/utils";
+import { PropertyType } from "@/types/property";
 import { useQueryClient } from "@tanstack/react-query";
 import { List, Map as MapIcon, MousePointer, X } from "lucide-react";
 import React, { useState, useEffect, useCallback, Suspense, lazy } from "react";
 
 // Lazy load the PropertyMap component - it's only needed when map view is active
 const PropertyMap = lazy(() =>
-  import("@/components/maps/v2").then((module) => ({
+  import("@/components/maps").then((module) => ({
     default: module.PropertyMap,
   }))
 );
@@ -34,9 +33,6 @@ export default function PropertiesPageClient() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDrawingMode, setIsDrawingMode] = useState(false);
-
-  // Use MapContext to manage map position state
-  const mapContext = useMapContext();
 
   // Log the current filters on mount/update for debugging
   useEffect(() => {
@@ -161,40 +157,14 @@ export default function PropertiesPageClient() {
     }
   }, [drawnArea]);
 
-  // Effect to sync map boundary data with local drawnArea state
-  useEffect(() => {
-    // Respond to changes in the mapContext boundary state
-    const hasBoundaryInContext = mapContext.state.hasBoundary;
-    const boundaryData = mapContext.state.boundaryData;
-
-    console.log("MapContext boundary state changed:", hasBoundaryInContext ? "exists" : "cleared");
-
-    if (hasBoundaryInContext && boundaryData.bounds && boundaryData.center) {
-      // Update our local state for the API request
-      setDrawnArea({
-        bounds: boundaryData.bounds,
-        center: boundaryData.center,
-        radius: boundaryData.radius,
-      });
-      setHasBoundary(true);
-
-      // Refetch properties
-      console.log("Refetching properties with boundary data");
-      refetchPropertiesV1();
-    } else if (!hasBoundaryInContext) {
-      // Clear local boundary state
-      setDrawnArea({
-        bounds: null,
-        center: null,
-        radius: null,
-      });
-      setHasBoundary(false);
-
-      // Refetch with cleared boundary
-      console.log("Refetching properties without boundary data");
-      refetchPropertiesV1();
-    }
-  }, [mapContext.state.hasBoundary, mapContext.state.boundaryData, refetchPropertiesV1]);
+  const resetBoundary = useCallback(() => {
+    setDrawnArea({
+      bounds: null,
+      center: null,
+      radius: null,
+    });
+    setHasBoundary(false);
+  }, []);
 
   // Log the results from the v1 API for testing
   useEffect(() => {
@@ -295,55 +265,8 @@ export default function PropertiesPageClient() {
 
   // Toggle drawing mode with smoother transition
   const toggleDrawingMode = useCallback(() => {
-    // If we're about to enter drawing mode, save the current position using our context
     if (!isDrawingMode) {
-      // Get direct access to the map instance if possible
-      let mapInstance: google.maps.Map | null = null;
-      try {
-        // Try to find all Google Map instances
-        const mapInstances = window.google?.maps?.__SECRET_MAP_INSTANCES?.values();
-        if (mapInstances) {
-          const instances = Array.from(mapInstances);
-          if (instances.length > 0) {
-            mapInstance = instances[0];
-          }
-        }
-      } catch (err) {
-        console.error("Error accessing map instance:", err);
-      }
-
-      // Save current position to context
-      mapContext.saveCurrentPosition();
-
-      // Also save as the drawing position
-      mapContext.saveDrawingPosition();
-
-      // Direct position capturing from map instance for more reliability
-      if (mapInstance && mapInstance.getCenter() && mapInstance.getZoom()) {
-        const center = mapInstance.getCenter();
-        const zoom = mapInstance.getZoom();
-
-        // Update global state variables directly
-        if (typeof window !== "undefined" && center && zoom) {
-          // @ts-ignore
-          window.globalMapState = {
-            center: { lat: center.lat(), lng: center.lng() },
-            zoom: zoom,
-            hasInitialized: true,
-          };
-          // @ts-ignore
-          window.cancellationState = {
-            center: { lat: center.lat(), lng: center.lng() },
-            zoom: zoom,
-            hasInitialized: true,
-          };
-        }
-      }
-
-      console.log("Client: Saved position using context before drawing mode");
-
-      // Give a longer delay to ensure the map position is fully updated
-      // before entering drawing mode
+      // Simply set drawing mode after a short delay
       setTimeout(() => {
         setIsDrawingMode(true);
       }, 300);
@@ -351,7 +274,7 @@ export default function PropertiesPageClient() {
       // When exiting drawing mode, no delay needed
       setIsDrawingMode(false);
     }
-  }, [isDrawingMode, mapContext]);
+  }, [isDrawingMode]);
 
   // Toggle view mode between map and list
   const toggleViewMode = (mode: "map" | "list") => {
@@ -374,9 +297,6 @@ export default function PropertiesPageClient() {
         radius: data.radius,
       });
       setHasBoundary(true);
-
-      // Update map context
-      mapContext.setBoundaryData(data);
 
       // Refetch properties with new boundary
       refetchPropertiesV1();
@@ -402,8 +322,8 @@ export default function PropertiesPageClient() {
           radius: null,
         });
 
-        // Update map context
-        mapContext.resetBoundary();
+        // Reset boundary in local state
+        resetBoundary();
 
         // Invalidate the properties query to trigger automatic refetch
         console.log("Invalidating properties query without geo params");

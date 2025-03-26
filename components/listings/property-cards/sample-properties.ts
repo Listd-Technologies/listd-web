@@ -1,4 +1,4 @@
-import { type ListingType, type PropertyType } from "@/components/providers/listing-provider";
+import { type ListingType, type PropertyType } from "@/types/property";
 import { type PropertyImage } from "./property-card";
 
 // Helper function to generate multiple images for a property

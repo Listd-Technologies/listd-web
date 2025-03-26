@@ -3,7 +3,7 @@
  * Handles transformation between frontend property parameters and API formats
  */
 
-import { PropertyType } from "@/components/providers/listing-provider";
+import { PropertyType } from "@/types/property";
 import {
   PropertyQueryParams,
   PropertyResponse,

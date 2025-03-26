@@ -3,7 +3,7 @@
  * These functions handle the conversion between application types and API expected formats
  */
 
-import { ListingType, PropertyType } from "@/components/providers/listing-provider";
+import { ListingType, PropertyType } from "@/types/property";
 import { Property, PropertySearchParams } from "../types";
 
 /**

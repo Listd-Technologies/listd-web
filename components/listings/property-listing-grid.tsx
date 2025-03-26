@@ -1,7 +1,6 @@
 "use client";
 
 import { PropertyCard } from "@/components/listings/property-cards";
-import { type ListingType, type PropertyType } from "@/components/providers/listing-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,11 +17,28 @@ import { type PropertyListingsFilter, usePropertyListings } from "@/hooks/api/us
 import { PropertyTypeToInterface } from "@/hooks/api/v1/types/property.types";
 import { cn } from "@/lib/utils";
 import { type BaseComponentProps } from "@/types";
+import { type ListingType, type PropertyType } from "@/types/property";
 import { motion } from "framer-motion";
 import { HeartIcon, MapPin, Share2 } from "lucide-react";
 import Image from "next/image";
 import React, { useState, useEffect, useMemo } from "react";
 import { type PropertyImage } from "./property-cards/property-card";
+
+// Add custom CSS to ensure carousel functionality
+const carouselStyles = {
+  carouselInteraction: `
+    .carousel-interaction {
+      pointer-events: auto !important;
+    }
+    .carousel-interaction * {
+      pointer-events: auto !important;
+    }
+    .embla__button {
+      z-index: 30 !important;
+      pointer-events: auto !important;
+    }
+  `,
+};
 
 export interface PropertyListingGridProps extends BaseComponentProps {
   /**
@@ -149,6 +165,43 @@ export function PropertyListingGrid({
   // Use pre-fetched properties if provided, otherwise fetch using adapter
   const shouldUseAdapter = !properties || properties.length === 0;
 
+  // Handle card click
+  const handleCardClick = (id: string) => {
+    console.log(`Clicked on property ${id}`);
+    // Navigate to property detail page
+    window.location.href = `/properties/showcase/${id}`;
+  };
+
+  // Handle favorite toggle
+  const handleFavoriteToggle = (id: string) => {
+    console.log(`Toggled favorite for property ${id}`);
+    setFavoriteProperties((prev) =>
+      prev.includes(id) ? prev.filter((propId) => propId !== id) : [...prev, id]
+    );
+  };
+
+  // Handle share click
+  const handleShareClick = (id: string) => {
+    console.log(`Sharing property ${id}`);
+    // Open share dialog or implement sharing functionality
+    try {
+      if (navigator.share) {
+        navigator
+          .share({
+            title: "Share Property",
+            text: `Check out this property on Listd!`,
+            url: `${window.location.origin}/properties/showcase/${id}`,
+          })
+          .catch((err) => console.error("Error sharing:", err));
+      } else {
+        // Fallback for browsers that don't support navigator.share
+        alert(`Copy this link to share: ${window.location.origin}/properties/showcase/${id}`);
+      }
+    } catch (err) {
+      console.error("Error sharing property:", err);
+    }
+  };
+
   // Add effect to fetch data using the property adapter when properties aren't provided
   useEffect(() => {
     if (shouldUseAdapter) {
@@ -223,6 +276,19 @@ export function PropertyListingGrid({
       setApiData(standardizedProperties);
     }
   }, [filters, propertyAdapter, properties, shouldUseAdapter]);
+
+  // Apply carousel CSS when component mounts
+  useEffect(() => {
+    // Add custom CSS for carousel interactions
+    const styleEl = document.createElement("style");
+    styleEl.textContent = carouselStyles.carouselInteraction;
+    document.head.appendChild(styleEl);
+
+    return () => {
+      // Clean up when component unmounts
+      document.head.removeChild(styleEl);
+    };
+  }, []);
 
   // Define the grid columns based on props
   const gridCols = {
@@ -368,31 +434,6 @@ export function PropertyListingGrid({
     );
   }
 
-  // Handle card click
-  const handleCardClick = (id: string) => {
-    console.log(`Clicked on property ${id}`);
-    // Navigate to property detail page or open modal
-  };
-
-  // Handle favorite toggle
-  const handleFavoriteToggle = (id: string) => {
-    console.log(`Toggled favorite for property ${id}`);
-
-    // Update favorites state for sample data
-    if (isLoadingApiAdapter) {
-      setFavoriteProperties((prev) =>
-        prev.includes(id) ? prev.filter((propId) => propId !== id) : [...prev, id]
-      );
-    }
-    // For API data, would normally call an API to update favorite status
-  };
-
-  // Handle share click
-  const handleShareClick = (id: string) => {
-    console.log(`Sharing property ${id}`);
-    // Open share dialog
-  };
-
   // Display vertical listing layout (Zillow-style)
   if (displayStyle === "vertical") {
     return (
@@ -413,24 +454,31 @@ export function PropertyListingGrid({
               initial="hidden"
               animate="visible"
               whileHover="hover"
-              onClick={() => handleCardClick(listing.id.toString())}
+              onClick={(e) => {
+                // Only handle clicks if not coming from carousel elements
+                if (!(e.target as HTMLElement).closest(".carousel-interaction")) {
+                  handleCardClick(listing.id.toString());
+                }
+              }}
             >
               {/* Property Image Carousel */}
-              <div className="md:w-2/5 h-60 md:h-auto relative bg-muted">
+              <div
+                className="md:w-2/5 h-60 md:h-auto relative bg-muted carousel-interaction"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <Carousel
-                  className="w-full h-full"
+                  className="w-full h-full carousel-interaction"
                   opts={{
                     loop: true,
                     dragFree: false,
                   }}
                   aria-label={`Photo gallery for ${listing.title}`}
-                  onClick={(e) => e.stopPropagation()}
                 >
                   <CarouselContent className="h-full">
                     {listing.images && listing.images.length > 0 ? (
                       listing.images.map((image: PropertyImage, index) => (
-                        <CarouselItem key={image.id} className="h-full">
-                          <div className="relative h-full w-full">
+                        <CarouselItem key={image.id} className="h-full carousel-interaction">
+                          <div className="relative h-full w-full pointer-events-none">
                             <Image
                               src={
                                 image.url ||
@@ -451,13 +499,13 @@ export function PropertyListingGrid({
                               }}
                               priority={index === 0}
                             />
-                            <div className="absolute inset-0 bg-black/10"></div>
+                            <div className="absolute inset-0 bg-black/10 pointer-events-none"></div>
                           </div>
                         </CarouselItem>
                       ))
                     ) : (
                       // Fallback if no images are available
-                      <CarouselItem className="h-full">
+                      <CarouselItem className="h-full carousel-interaction">
                         <div className="relative h-full w-full">
                           <div className="absolute inset-0 flex items-center justify-center bg-muted">
                             <p className="text-2xl text-muted-foreground">{listing.propertyType}</p>
@@ -467,19 +515,20 @@ export function PropertyListingGrid({
                     )}
                   </CarouselContent>
                   <CarouselPrevious
-                    className="absolute left-2 top-1/2 -translate-y-1/2 z-20"
-                    onClick={(e) => e.stopPropagation()}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 z-20 carousel-interaction"
                     aria-label="View previous photo"
                   />
                   <CarouselNext
-                    className="absolute right-2 top-1/2 -translate-y-1/2 z-20"
-                    onClick={(e) => e.stopPropagation()}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 z-20 carousel-interaction"
                     aria-label="View next photo"
                   />
                 </Carousel>
 
                 {/* Listing Type Badge */}
-                <motion.div className="absolute top-3 left-3 z-10" variants={badgeVariants}>
+                <motion.div
+                  className="absolute top-3 left-3 z-10 pointer-events-none"
+                  variants={badgeVariants}
+                >
                   <Badge
                     className={cn(
                       "font-medium",
@@ -493,14 +542,17 @@ export function PropertyListingGrid({
                 </motion.div>
 
                 {/* Property Type */}
-                <motion.div className="absolute top-3 right-3 z-10" variants={badgeVariants}>
+                <motion.div
+                  className="absolute top-3 right-3 z-10 pointer-events-none"
+                  variants={badgeVariants}
+                >
                   <Badge variant="outline" className="bg-background/80 backdrop-blur-sm">
                     {listing.propertyType}
                   </Badge>
                 </motion.div>
 
                 {/* Featured & New Badges */}
-                <div className="absolute bottom-3 left-3 z-10 flex gap-2">
+                <div className="absolute bottom-3 left-3 z-10 flex gap-2 pointer-events-none">
                   {listing.isFeatured && (
                     <motion.div variants={badgeVariants}>
                       <Badge className="bg-amber-500 text-white">Featured</Badge>
@@ -511,6 +563,41 @@ export function PropertyListingGrid({
                       <Badge className="bg-green-500 text-white">New</Badge>
                     </motion.div>
                   )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="absolute bottom-3 right-3 z-10 flex gap-2">
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm carousel-interaction"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleFavoriteToggle(listing.id.toString());
+                    }}
+                  >
+                    <HeartIcon
+                      className={cn(
+                        "h-4 w-4",
+                        favoriteProperties.includes(listing.id.toString())
+                          ? "fill-red-500 text-red-500"
+                          : "text-foreground"
+                      )}
+                    />
+                    <span className="sr-only">Favorite</span>
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm carousel-interaction"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleShareClick(listing.id.toString());
+                    }}
+                  >
+                    <Share2 className="h-4 w-4" />
+                    <span className="sr-only">Share</span>
+                  </Button>
                 </div>
               </div>
 
@@ -567,39 +654,6 @@ export function PropertyListingGrid({
                   <span className="text-sm text-muted-foreground">
                     {listing.agent || "Listd Realty"}
                   </span>
-                  <div className="flex gap-2">
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      className="h-10 w-10 rounded-full"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleFavoriteToggle(listing.id.toString());
-                      }}
-                    >
-                      <HeartIcon
-                        className={cn(
-                          "h-5 w-5",
-                          favoriteProperties.includes(listing.id.toString())
-                            ? "fill-red-500 text-red-500"
-                            : "text-foreground"
-                        )}
-                      />
-                      <span className="sr-only">Favorite</span>
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      className="h-10 w-10 rounded-full"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleShareClick(listing.id.toString());
-                      }}
-                    >
-                      <Share2 className="h-5 w-5" />
-                      <span className="sr-only">Share</span>
-                    </Button>
-                  </div>
                 </div>
               </div>
             </motion.div>

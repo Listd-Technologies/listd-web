@@ -1,6 +1,6 @@
 "use client";
 
-import { type ListingType, type PropertyType } from "@/components/providers/listing-provider";
+import { type ListingType, type PropertyType } from "@/types/property";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {

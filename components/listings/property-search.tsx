@@ -11,6 +11,16 @@ import React, { useState } from "react";
 const DEFAULT_FILTERS: PropertyListingsFilter = {
   listingType: "buy", // Default to buy
   propertyType: "condominium", // Default to condominium
+  location: "", // Empty location
+  minPrice: 0,
+  maxPrice: 0,
+  minSqmPrice: 0,
+  maxSqmPrice: 0,
+  activePriceType: "total", // Default to total price
+  minBedrooms: 0,
+  minBathrooms: 0,
+  minArea: 0,
+  maxArea: 0,
 };
 
 export interface PropertySearchProps extends BaseComponentProps {

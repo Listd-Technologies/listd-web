@@ -1,7 +1,7 @@
 "use client";
 
-import { type ListingType, type PropertyType } from "@/components/providers/listing-provider";
 import { type PropertyListingsFilter } from "@/hooks/api/usePropertyListings";
+import { type ListingType, type PropertyType } from "@/types/property";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
@@ -20,6 +20,14 @@ const DEFAULT_FILTERS: PropertyListingsFilter = {
   minBathrooms: 0,
   minArea: 0,
   maxArea: 0,
+  // Location boundary fields
+  centerLat: undefined,
+  centerLng: undefined,
+  radius: undefined,
+  boundMinX: undefined,
+  boundMinY: undefined,
+  boundMaxX: undefined,
+  boundMaxY: undefined,
 };
 
 // Define Zod schema for filter validation
@@ -41,6 +49,16 @@ const filtersSchema = z.object({
   minBathrooms: z.number().min(0).default(0),
   minArea: z.number().min(0).default(0),
   maxArea: z.number().min(0).default(0),
+  sortField: z.string().optional(),
+  sortOrder: z.enum(["asc", "desc"]).optional(),
+  // Location boundary fields
+  centerLat: z.number().optional(),
+  centerLng: z.number().optional(),
+  radius: z.number().min(0).optional(),
+  boundMinX: z.number().optional(),
+  boundMinY: z.number().optional(),
+  boundMaxX: z.number().optional(),
+  boundMaxY: z.number().optional(),
 });
 
 // Schema for partial filter updates
@@ -194,11 +212,20 @@ export function urlParamsToFilters(
     return 0;
   };
 
+  // Get coordinate value safely with undefined fallback
+  const getCoordValue = (key: string) => {
+    const value = params[key];
+    return value != null ? Number(value) : undefined;
+  };
+
   // Handle listing type with careful checking
   let listingType: ListingType = "buy"; // Default
-  if (params["listing-type"] === "for-rent") {
+
+  // Support both formats (with or without 'for-' prefix) for backward compatibility
+  const listingTypeParam = params["listing-type"];
+  if (listingTypeParam === "rent" || listingTypeParam === "for-rent") {
     listingType = "rent";
-  } else if (params["listing-type"] === "for-sale") {
+  } else if (listingTypeParam === "buy" || listingTypeParam === "for-sale") {
     listingType = "buy";
   }
 
@@ -224,6 +251,14 @@ export function urlParamsToFilters(
     minBathrooms: getNumberValue("min-bathrooms", "minBathrooms"),
     minArea: getNumberValue("min-area", "minArea"),
     maxArea: getNumberValue("max-area", "maxArea"),
+    // Location boundary fields with undefined fallback
+    centerLat: getCoordValue("center-lat"),
+    centerLng: getCoordValue("center-lng"),
+    radius: getCoordValue("radius"),
+    boundMinX: getCoordValue("bound-min-x"),
+    boundMinY: getCoordValue("bound-min-y"),
+    boundMaxX: getCoordValue("bound-max-x"),
+    boundMaxY: getCoordValue("bound-max-y"),
   };
 
   // Validate with Zod schema and apply defaults
@@ -246,15 +281,8 @@ export function filtersToUrlParams(
 ): Record<string, string | number | undefined> {
   const params: Record<string, string | number | undefined> = {};
 
-  // Handle listing type with careful checking
-  if (filters.listingType === "rent") {
-    params["listing-type"] = "for-rent";
-  } else if (filters.listingType === "buy") {
-    params["listing-type"] = "for-sale";
-  } else {
-    // Default fallback
-    params["listing-type"] = "for-sale";
-  }
+  // Use consistent format without "for-" prefix
+  params["listing-type"] = filters.listingType || "buy";
 
   // Set property type with default fallback
   if (filters.propertyType) {
@@ -302,6 +330,35 @@ export function filtersToUrlParams(
 
   if (filters.maxArea && filters.maxArea > 0) {
     params["max-area"] = filters.maxArea;
+  }
+
+  // Add location boundary parameters if they exist
+  if (filters.centerLat !== undefined) {
+    params["center-lat"] = filters.centerLat;
+  }
+
+  if (filters.centerLng !== undefined) {
+    params["center-lng"] = filters.centerLng;
+  }
+
+  if (filters.radius !== undefined && filters.radius > 0) {
+    params["radius"] = filters.radius;
+  }
+
+  if (filters.boundMinX !== undefined) {
+    params["bound-min-x"] = filters.boundMinX;
+  }
+
+  if (filters.boundMinY !== undefined) {
+    params["bound-min-y"] = filters.boundMinY;
+  }
+
+  if (filters.boundMaxX !== undefined) {
+    params["bound-max-x"] = filters.boundMaxX;
+  }
+
+  if (filters.boundMaxY !== undefined) {
+    params["bound-max-y"] = filters.boundMaxY;
   }
 
   return params;

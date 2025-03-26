@@ -9,7 +9,7 @@
  */
 
 import { type PropertyImage } from "@/components/listings/property-cards/property-card";
-import { type ListingType, type PropertyType } from "@/components/providers/listing-provider";
+import { type ListingType, type PropertyType } from "@/types/property";
 import { PropertyTypeToInterface } from "../v1/types/property.types";
 
 // Common features for properties

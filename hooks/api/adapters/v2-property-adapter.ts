@@ -6,7 +6,7 @@
  * is ready for integration.
  */
 
-import { type ListingType, type PropertyType } from "@/components/providers/listing-provider";
+import { type ListingType, type PropertyType } from "@/types/property";
 import { PropertyTypeToInterface } from "../v1/types/property.types";
 import {
   PropertyApiAdapter,

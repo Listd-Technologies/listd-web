@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const navLinks = [
   { href: "/properties", label: "Properties", preserveParams: true },
@@ -25,11 +25,20 @@ export function Navbar() {
   // Check if we're in development mode
   const isDevelopment = process.env.NODE_ENV === "development";
 
+  // Debug effect to log when search params change
+  useEffect(() => {
+    if (searchParams.toString() !== "") {
+      console.log("🧭 Navbar - Current URL parameters:", searchParams.toString());
+    }
+  }, [searchParams]);
+
   // Function to get the correct href
   // For properties link we need to preserve all URL parameters
   const getNavHref = (link: { href: string; preserveParams?: boolean }) => {
     if (link.preserveParams && searchParams.toString()) {
-      return `${link.href}?${searchParams.toString()}`;
+      const fullUrl = `${link.href}?${searchParams.toString()}`;
+      console.log(`🔗 Navbar - Creating link with preserved params: ${fullUrl}`);
+      return fullUrl;
     }
     return link.href;
   };

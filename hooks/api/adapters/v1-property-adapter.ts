@@ -11,7 +11,7 @@ import {
   inferListingTypeFromTitle,
   mapApiToListingType,
   mapListingTypeToApi,
-} from "@/components/providers/listing-provider";
+} from "@/types/property";
 import {
   type PropertyQueryParams,
   type PropertyResponse,

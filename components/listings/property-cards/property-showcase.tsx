@@ -1,16 +1,13 @@
 "use client";
 
-import {
-  ListingType,
-  PropertyType,
-  useListingContext,
-} from "@/components/providers/listing-provider";
 import { Button } from "@/components/ui/button";
 import { EnhancedSkeleton } from "@/components/ui/enhanced-skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePropertyListings } from "@/hooks/api/usePropertyListings";
+import { usePropertyFiltersStore } from "@/lib/stores/propertyFilters";
 import { cn } from "@/lib/utils";
 import { type BaseComponentProps } from "@/types";
+import { ListingType, PropertyType } from "@/types/property";
 import { motion } from "framer-motion";
 import React, { useState, useEffect } from "react";
 import { PropertyCard, type PropertyCardProps } from "./property-card";
@@ -76,14 +73,17 @@ export function PropertyShowcase({
   maxPerType = 3,
   ...props
 }: PropertyShowcaseProps) {
-  // Get the listing context
-  const { state, dispatch } = useListingContext();
+  // Get the filters from Zustand store
+  const { filters, updateFilters } = usePropertyFiltersStore();
 
   // State for favorites and loading state
   const [favoriteProperties, setFavoriteProperties] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   // Local state to track if "All" property types filter is active
   const [isAllPropertyTypesSelected, setIsAllPropertyTypesSelected] = useState(true);
+
+  // Available property types
+  const propertyTypes: PropertyType[] = ["condominium", "house-and-lot", "vacant-lot", "warehouse"];
 
   // This is to simulate real API loading when switching filters
   // biome-ignore lint/correctness/useExhaustiveDependencies: This effect is intentionally dependent only on filter changes to simulate API loading
@@ -94,17 +94,17 @@ export function PropertyShowcase({
     }, 800);
 
     return () => clearTimeout(timer);
-  }, [state.currentListingType, state.currentPropertyType, isAllPropertyTypesSelected]);
+  }, [filters.listingType, filters.propertyType, isAllPropertyTypesSelected]);
 
   // Filter properties based on selection
   const getFilteredProperties = () => {
     let filteredProps: PropertyCardProps[];
 
     if (isAllPropertyTypesSelected) {
-      filteredProps = propertiesByListingType[state.currentListingType];
+      filteredProps = propertiesByListingType[filters.listingType];
     } else {
-      filteredProps = propertiesByType[state.currentPropertyType].filter(
-        (prop) => prop.listingType === state.currentListingType
+      filteredProps = propertiesByType[filters.propertyType].filter(
+        (prop) => prop.listingType === filters.listingType
       );
     }
 
@@ -130,9 +130,8 @@ export function PropertyShowcase({
 
   // Handle listing type change
   const handleListingTypeChange = (value: string) => {
-    dispatch({
-      type: "SET_LISTING_TYPE",
-      payload: value as ListingType,
+    updateFilters({
+      listingType: value as ListingType,
     });
   };
 
@@ -144,9 +143,8 @@ export function PropertyShowcase({
     }
 
     setIsAllPropertyTypesSelected(false);
-    dispatch({
-      type: "SET_PROPERTY_TYPE",
-      payload: value as PropertyType,
+    updateFilters({
+      propertyType: value as PropertyType,
     });
   };
 
@@ -156,7 +154,7 @@ export function PropertyShowcase({
       <div className="space-y-4">
         {/* Listing Type Tabs */}
         <Tabs
-          value={state.currentListingType}
+          value={filters.listingType}
           onValueChange={handleListingTypeChange}
           className="w-full"
         >
@@ -177,19 +175,17 @@ export function PropertyShowcase({
               All
             </Button>
           )}
-          {state.propertyTypes.map((type) => (
+          {propertyTypes.map((type) => (
             <Button
               key={type}
               variant={
-                !isAllPropertyTypesSelected && state.currentPropertyType === type
-                  ? "default"
-                  : "outline"
+                !isAllPropertyTypesSelected && filters.propertyType === type ? "default" : "outline"
               }
               size="sm"
               onClick={() => handlePropertyTypeChange(type)}
               className={
                 !properties.some(
-                  (p) => p.propertyType === type && p.listingType === state.currentListingType
+                  (p) => p.propertyType === type && p.listingType === filters.listingType
                 )
                   ? "opacity-50"
                   : ""
@@ -247,18 +243,10 @@ export function PropertyShowcase({
               <h3 className="text-lg font-medium mb-2">No properties found</h3>
               <p className="text-muted-foreground">
                 There are no{" "}
-                {isAllPropertyTypesSelected ? "" : formatPropertyType(state.currentPropertyType)}{" "}
-                properties {formatListingType(state.currentListingType)} at this time.
+                {isAllPropertyTypesSelected ? "" : formatPropertyType(filters.propertyType)}{" "}
+                properties currently available for {filters.listingType === "buy" ? "sale" : "rent"}
+                .
               </p>
-            </div>
-          )}
-
-          {/* View More Button */}
-          {getFilteredProperties().length > 0 && (
-            <div className="flex justify-center mt-8">
-              <Button size="lg" className="px-8">
-                View More Properties
-              </Button>
             </div>
           )}
         </>

@@ -1,7 +1,7 @@
 "use client";
 
 import { allProperties } from "@/components/listings/property-cards/sample-properties";
-import { PropertyMap } from "@/components/maps/v2";
+import { PropertyMap } from "@/components/maps";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Map as MapIcon, Moon, MousePointer, Sun, X } from "lucide-react";

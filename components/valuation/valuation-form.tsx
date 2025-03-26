@@ -1,6 +1,6 @@
 "use client";
 
-import { PropertyType } from "@/components/providers/listing-provider";
+import { PropertyType } from "@/types/property";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";

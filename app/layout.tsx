@@ -1,10 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { ContextDevTools } from "@/components/dev/context-devtools";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
-import { ListingProvider } from "@/components/providers/listing-provider";
+import { PropertyFiltersProvider } from "@/components/providers/property-filters-provider";
 import { ReactQueryProvider } from "@/components/providers/react-query-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { ClerkProvider } from "@clerk/nextjs";
@@ -99,25 +98,20 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Only include DevTools in development mode
-  const isDevelopment =
-    process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_ENABLE_DEVTOOLS === "true";
-
   return (
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning>
         <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
           <ThemeProvider>
             <ReactQueryProvider>
-              <ListingProvider>
+              <PropertyFiltersProvider>
                 <div className="flex min-h-screen flex-col">
                   <Navbar />
                   <main className="flex-1">{children}</main>
                   <Footer />
                 </div>
                 {/* Development Tools - always available in development mode */}
-                {isDevelopment && <ContextDevTools />}
-              </ListingProvider>
+              </PropertyFiltersProvider>
             </ReactQueryProvider>
           </ThemeProvider>
         </body>

@@ -2,7 +2,7 @@
  * Hooks for fetching property data from the v1 API
  */
 
-import { PropertyType } from "@/components/providers/listing-provider";
+import { PropertyType } from "@/types/property";
 import {
   InfiniteData,
   UseInfiniteQueryResult,

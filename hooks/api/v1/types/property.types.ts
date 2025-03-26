@@ -1,7 +1,7 @@
 /**
  * Types for property data from the v1 API
  */
-import { PropertyType } from "@/components/providers/listing-provider";
+import { PropertyType } from "@/types/property";
 
 // Property type mapping
 export const PropertyTypeMap = {
