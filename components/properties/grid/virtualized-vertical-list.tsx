@@ -220,7 +220,7 @@ export function VirtualizedVerticalList({
     <div
       ref={parentRef}
       className={cn("overflow-auto", className)}
-      style={{ height: typeof height === "number" ? `${height}px` : height }}
+      style={{ height: typeof height === "number" ? `${height}px` : height, paddingBottom: 0 }}
     >
       <div
         style={{

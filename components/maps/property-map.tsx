@@ -1,148 +1,22 @@
 "use client";
 
 import { type PropertyCardProps } from "@/components/listings/property-cards/property-card";
-import { Button } from "@/components/ui/button";
 import { APIProvider, ColorScheme, Map } from "@vis.gl/react-google-maps";
-import { X } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useRef, useState } from "react";
-import DrawingCanvas from "./drawing-canvas";
 import { PropertyMarker } from "./property-marker";
 
-// ========================================================================
-// CONSTANTS & SHARED STATE
-// ========================================================================
+import { useBoundaryVisualization } from "./components/boundary-visualization";
+// Import extracted components and utilities
+import { ClearBoundaryButton } from "./components/clear-boundary-button";
+import { DrawingModeIndicator } from "./components/drawing-mode-indicator";
+import { DARK_MODE_STYLES, DEFAULT_CENTER, DEFAULT_ZOOM } from "./constants/map-styles";
+import { BoundaryData, PropertyMapProps } from "./types/map-types";
+import { v2CancellationState } from "./utils/drawing-state";
 
-// Default center coordinates for map initialization
-const DEFAULT_CENTER = { lat: 14.5995, lng: 120.9842 }; // Manila, Philippines
-const DEFAULT_ZOOM = 14;
-
-// Map styles for dark mode - based on Google's Night Mode styling
-const DARK_MODE_STYLES = [
-  { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
-  {
-    featureType: "administrative.locality",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#d59563" }],
-  },
-  {
-    featureType: "poi",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#d59563" }],
-  },
-  {
-    featureType: "poi.park",
-    elementType: "geometry",
-    stylers: [{ color: "#263c3f" }],
-  },
-  {
-    featureType: "poi.park",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#6b9a76" }],
-  },
-  {
-    featureType: "road",
-    elementType: "geometry",
-    stylers: [{ color: "#38414e" }],
-  },
-  {
-    featureType: "road",
-    elementType: "geometry.stroke",
-    stylers: [{ color: "#212a37" }],
-  },
-  {
-    featureType: "road",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#9ca5b3" }],
-  },
-  {
-    featureType: "road.highway",
-    elementType: "geometry",
-    stylers: [{ color: "#746855" }],
-  },
-  {
-    featureType: "road.highway",
-    elementType: "geometry.stroke",
-    stylers: [{ color: "#1f2835" }],
-  },
-  {
-    featureType: "road.highway",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#f3d19c" }],
-  },
-  {
-    featureType: "transit",
-    elementType: "geometry",
-    stylers: [{ color: "#2f3948" }],
-  },
-  {
-    featureType: "transit.station",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#d59563" }],
-  },
-  {
-    featureType: "water",
-    elementType: "geometry",
-    stylers: [{ color: "#17263c" }],
-  },
-  {
-    featureType: "water",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#515c6d" }],
-  },
-  {
-    featureType: "water",
-    elementType: "labels.text.stroke",
-    stylers: [{ color: "#17263c" }],
-  },
-];
-
-// Reference to the shared cancellation state from drawing-canvas.tsx
-// This ensures position synchronization between components
-declare const v2CancellationState: {
-  center: { lat: number; lng: number };
-  zoom: number;
-  hasInitialized: boolean;
-};
-
-// ========================================================================
-// TYPE DEFINITIONS
-// ========================================================================
-
-// Property interfaces - extend from PropertyCardProps to ensure compatibility
-interface MapProperty extends Partial<PropertyCardProps> {
-  id: string;
-  title: string;
-  mapLocation?: {
-    lat: number;
-    lng: number;
-  };
-  // Allow additional properties with string indexing
-  [key: string]: unknown;
-}
-
-// Boundary data interface
-interface BoundaryData {
-  polygon: google.maps.Polygon;
-  bounds: google.maps.LatLngBounds;
-  center: google.maps.LatLng;
-  radius: number;
-}
-
-interface PropertyMapProps {
-  properties: MapProperty[];
-  onMarkerClick?: (propertyId: string) => void;
-  onBoundsChange?: (bounds: google.maps.LatLngBounds | null) => void;
-  onDrawComplete?: (data: BoundaryData) => void;
-  isDrawingMode?: boolean;
-  toggleDrawingMode?: () => void;
-  className?: string;
-  preserveView?: boolean;
-  onBoundaryChange?: (hasBoundary: boolean) => void;
-  darkMode?: boolean; // Optional prop - if not provided, will use theme context
-}
+// Import DrawingCanvas dynamically as it's conditionally rendered
+import dynamic from "next/dynamic";
+const DrawingCanvas = dynamic(() => import("./drawing-canvas"), { ssr: false });
 
 /**
  * Enhanced property map component with drawing and search capabilities
@@ -150,6 +24,18 @@ interface PropertyMapProps {
  * - Supports freehand polygon drawing for geographic searches
  * - Optimized for both desktop and mobile experiences
  * - Dark mode support for better visibility in low-light conditions
+ *
+ * @component
+ * @example
+ * ```tsx
+ * <PropertyMap
+ *   properties={properties}
+ *   onMarkerClick={handlePropertySelect}
+ *   onDrawComplete={handleBoundaryDraw}
+ *   isDrawingMode={drawingMode}
+ *   toggleDrawingMode={() => setDrawingMode(!drawingMode)}
+ *   onBoundaryChange={handleBoundaryStatusChange}
+ * />
  */
 export function PropertyMap({
   properties,
@@ -162,6 +48,8 @@ export function PropertyMap({
   preserveView = false,
   onBoundaryChange,
   darkMode: darkModeProp, // Renamed to darkModeProp to avoid conflict
+  renderControls,
+  initialBoundary,
 }: PropertyMapProps) {
   // Get theme from the ThemeProvider
   const { resolvedTheme } = useTheme();
@@ -178,8 +66,6 @@ export function PropertyMap({
   const mapRef = useRef<google.maps.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const polygonRef = useRef<google.maps.Polygon | null>(null);
-  const centerMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
-  const boundingBoxRef = useRef<google.maps.Rectangle | null>(null);
 
   // Position tracking - crucial for maintaining view during mode changes
   const lastPositionRef = useRef<{ center: google.maps.LatLng; zoom: number } | null>(null);
@@ -190,121 +76,10 @@ export function PropertyMap({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [hasBoundary, setHasBoundary] = useState(false);
 
-  // ========================================================================
-  // VISUALIZATION UTILITIES
-  // ========================================================================
-
-  // Color constants based on theme
-  const getThemeColors = useCallback(() => {
-    return darkMode
-      ? {
-          primary: "#a78bfa", // Light purple for dark mode
-          secondary: "#8b5cf6", // Brighter purple
-          stroke: "#ffffff", // White stroke
-          fill: "rgba(167, 139, 250, 0.3)", // Semi-transparent purple
-          background: "#1f2937", // Dark background
-          text: "#e5e7eb", // Light text
-          shadow: "rgba(0, 0, 0, 0.5)", // Dark shadow
-        }
-      : {
-          primary: "#6B21A8", // Default purple
-          secondary: "#7928CA", // Darker purple
-          stroke: "#FFFFFF", // White stroke
-          fill: "rgba(107, 33, 168, 0.2)", // Semi-transparent purple
-          background: "#ffffff", // White background
-          text: "#334155", // Dark text
-          shadow: "rgba(0, 0, 0, 0.2)", // Light shadow
-        };
-  }, [darkMode]);
-
-  // Clear all boundary visualizations
-  const clearVisualizations = useCallback(() => {
-    // Clean up center marker
-    if (centerMarkerRef.current) {
-      centerMarkerRef.current.map = null;
-      centerMarkerRef.current = null;
-    }
-
-    // Clean up bounding box
-    if (boundingBoxRef.current) {
-      boundingBoxRef.current.setMap(null);
-      boundingBoxRef.current = null;
-    }
-  }, []);
-
-  // Display center marker at search area center
-  const showCenterMarker = useCallback(
-    (center: google.maps.LatLng) => {
-      if (!mapRef.current) return;
-
-      const colors = getThemeColors();
-
-      // Create marker HTML element
-      const createMarkerElement = () => {
-        const element = document.createElement("div");
-        element.innerHTML = `
-          <div style="
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background-color: ${colors.primary};
-            border: 2px solid ${colors.stroke};
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 4px ${colors.shadow};
-          "></div>
-        `;
-        return element;
-      };
-
-      // Create advanced marker with modern API
-      const createAdvancedMarker = async () => {
-        try {
-          const { AdvancedMarkerElement } = (await google.maps.importLibrary("marker")) as {
-            AdvancedMarkerElement: typeof google.maps.marker.AdvancedMarkerElement;
-          };
-
-          const centerMarker = new AdvancedMarkerElement({
-            position: center,
-            map: mapRef.current,
-            content: createMarkerElement(),
-            title: "Center of Search Area",
-            zIndex: 1000,
-          });
-
-          centerMarkerRef.current = centerMarker;
-        } catch (error) {
-          console.error("Error creating advanced marker:", error);
-        }
-      };
-
-      createAdvancedMarker();
-    },
-    [mapRef, getThemeColors]
-  );
-
-  // Display rectangle around search area bounds
-  const showBoundingBox = useCallback(
-    (bounds: google.maps.LatLngBounds) => {
-      if (!mapRef.current) return;
-
-      const colors = getThemeColors();
-
-      const boundingBox = new google.maps.Rectangle({
-        bounds: bounds,
-        strokeColor: colors.primary,
-        strokeOpacity: 0.8,
-        strokeWeight: 1,
-        fillColor: "transparent",
-        fillOpacity: 0,
-        map: mapRef.current,
-        zIndex: 50,
-      });
-
-      boundingBoxRef.current = boundingBox;
-    },
-    [mapRef, getThemeColors]
+  // Use boundary visualization hook
+  const { clearVisualizations, showCenterMarker, showBoundingBox } = useBoundaryVisualization(
+    mapRef,
+    darkMode
   );
 
   // ========================================================================
@@ -336,8 +111,25 @@ export function PropertyMap({
           onBoundsChange(bounds);
         }
       });
+
+      // Initialize boundary from props if available
+      if (initialBoundary) {
+        if (initialBoundary.bounds) {
+          showBoundingBox(initialBoundary.bounds);
+          setHasBoundary(true);
+          if (onBoundaryChange) {
+            onBoundaryChange(true);
+          }
+        } else if (initialBoundary.center && initialBoundary.radius) {
+          showCenterMarker(initialBoundary.center);
+          setHasBoundary(true);
+          if (onBoundaryChange) {
+            onBoundaryChange(true);
+          }
+        }
+      }
     },
-    [onBoundsChange]
+    [onBoundsChange, initialBoundary, showBoundingBox, showCenterMarker, onBoundaryChange]
   );
 
   // ========================================================================
@@ -356,9 +148,6 @@ export function PropertyMap({
       const positionBeforeDrawing =
         currentCenter && currentZoom ? { center: currentCenter, zoom: currentZoom } : null;
 
-      // Get theme-specific colors
-      const colors = getThemeColors();
-
       // 2. Clear existing visualizations
       if (polygonRef.current) {
         polygonRef.current.setMap(null);
@@ -369,10 +158,10 @@ export function PropertyMap({
       // 3. Create new polygon
       const polygon = new google.maps.Polygon({
         paths: latLngPoints,
-        fillColor: colors.primary,
+        fillColor: darkMode ? "#a78bfa" : "#6B21A8",
         fillOpacity: darkMode ? 0.3 : 0.2, // Slightly more opaque in dark mode for visibility
         strokeWeight: 2,
-        strokeColor: colors.primary,
+        strokeColor: darkMode ? "#a78bfa" : "#6B21A8",
         strokeOpacity: 1,
         clickable: true,
         editable: false,
@@ -429,10 +218,81 @@ export function PropertyMap({
       onDrawComplete,
       isDrawingMode,
       toggleDrawingMode,
-      getThemeColors,
       darkMode,
     ]
   );
+
+  // ========================================================================
+  // PROPS DOCUMENTATION
+  // ========================================================================
+
+  /**
+   * @typedef {Object} PropertyMapProps Properties for the PropertyMap component
+   *
+   * @property {MapProperty[]} properties - Array of property objects to display on the map.
+   * Each property must have an id, title, and optional mapLocation with lat/lng coordinates.
+   * When a property has valid coordinates, it will be displayed as a marker on the map.
+   * Example: [{ id: "1", title: "Beach House", mapLocation: { lat: 14.123, lng: 120.456 } }]
+   *
+   * @property {function} [onMarkerClick] - Callback fired when a property marker is clicked.
+   * Receives the property ID as a parameter.
+   * Use this to handle property selection in the parent component.
+   * Example: (propertyId) => { setSelectedProperty(propertyId); }
+   *
+   * @property {function} [onBoundsChange] - Callback fired when the map's viewport bounds change.
+   * Receives the current bounds object or null if bounds aren't available.
+   * Useful for tracking the visible area of the map.
+   * Example: (bounds) => { console.log("Current bounds:", bounds); }
+   *
+   * @property {function} [onDrawComplete] - Callback fired when a boundary drawing is completed.
+   * Receives a BoundaryData object with polygon, bounds, center, and radius properties.
+   * Use this to capture the drawn area for filtering properties.
+   * Example: (data) => { setSearchBoundary(data); filterProperties(data); }
+   *
+   * @property {boolean} [isDrawingMode=false] - Controls whether the map is in drawing mode.
+   * When true, a drawing canvas is displayed and map interactions are adjusted.
+   * Default is false.
+   * Example: true
+   *
+   * @property {function} [toggleDrawingMode] - Function to toggle drawing mode on/off.
+   * This function is called after a drawing is completed or cancelled.
+   * Should update the isDrawingMode state in the parent component.
+   * Example: () => setIsDrawingMode(!isDrawingMode)
+   *
+   * @property {string} [className=""] - Additional CSS class names to apply to the map container.
+   * Useful for custom styling or layout integration.
+   * Default is an empty string.
+   * Example: "h-[500px] rounded-lg shadow-md"
+   *
+   * @property {boolean} [preserveView=false] - Whether to preserve the current map view when properties change.
+   * When false, the map will automatically fit to show all property markers.
+   * When true, the map won't change position when properties are updated.
+   * Default is false.
+   * Example: true
+   *
+   * @property {function} [onBoundaryChange] - Callback fired when boundary status changes.
+   * Receives a boolean indicating whether a boundary is currently active.
+   * Useful for updating UI elements based on boundary status.
+   * Example: (hasBoundary) => { setShowClearButton(hasBoundary); }
+   *
+   * @property {boolean} [darkMode] - Explicitly controls dark mode for the map.
+   * When undefined, automatically uses the theme from context.
+   * When provided, overrides the theme context value.
+   * Example: true
+   *
+   * @property {Object} [renderControls] - Custom control components to render within the map.
+   * Allows overriding default control UI with custom components.
+   * Example: { clearBoundaryButton: <CustomClearButton />, cancelDrawingButton: <CustomCancelButton /> }
+   *
+   * @property {Object} [initialBoundary] - Initial boundary configuration to display on mount.
+   * Can specify either bounds or center/radius for the initial boundary.
+   * Useful for restoring a previous search area.
+   * Example: { bounds: myBounds, center: null, radius: null }
+   */
+
+  // ========================================================================
+  // REMAINING COMPONENT IMPLEMENTATION
+  // ========================================================================
 
   // Clear drawn boundary with smooth transition
   const handleClearBoundary = useCallback(() => {
@@ -465,38 +325,16 @@ export function PropertyMap({
       });
     }
 
-    // Hide and remove center marker with opacity transition
-    if (centerMarkerRef.current && centerMarkerRef.current.element) {
-      centerMarkerRef.current.element.style.opacity = "0";
-      requestAnimationFrame(() => {
-        if (centerMarkerRef.current) {
-          centerMarkerRef.current.map = null;
-          centerMarkerRef.current = null;
-        }
-      });
-    }
+    // 4. Clear visualizations
+    clearVisualizations();
 
-    // Hide and remove bounding box with opacity transition
-    if (boundingBoxRef.current) {
-      boundingBoxRef.current.setOptions({
-        strokeOpacity: 0,
-        fillOpacity: 0,
-      });
-      requestAnimationFrame(() => {
-        if (boundingBoxRef.current) {
-          boundingBoxRef.current.setMap(null);
-          boundingBoxRef.current = null;
-        }
-      });
-    }
-
-    // 4. Update boundary state before removing elements to prevent visual jumps
+    // 5. Update boundary state before removing elements to prevent visual jumps
     setHasBoundary(false);
     if (onBoundaryChange) {
       onBoundaryChange(false);
     }
 
-    // 5. Ensure position is maintained throughout the transition
+    // 6. Ensure position is maintained throughout the transition
     if (currentCenter && currentZoom) {
       // Force position restoration in next frame
       requestAnimationFrame(() => {
@@ -505,11 +343,11 @@ export function PropertyMap({
       });
     }
 
-    // 6. Reset animation state after transition completes
+    // 7. Reset animation state after transition completes
     setTimeout(() => {
       setClearingBoundary(false);
     }, 300);
-  }, [onBoundaryChange]);
+  }, [onBoundaryChange, clearVisualizations]);
 
   // Process drawn boundary
   const handleDrawingFinish = useCallback(
@@ -677,42 +515,24 @@ export function PropertyMap({
               onCancel={() => {
                 if (toggleDrawingMode) toggleDrawingMode();
               }}
+              renderControls={{
+                cancelDrawingButton: renderControls?.cancelDrawingButton,
+              }}
             />
           )}
 
           {/* Clear boundary button */}
           {hasBoundary && !isDrawingMode && (
-            <div
-              className={`absolute top-4 right-4 z-20 transition-all duration-300 ${
-                clearingBoundary ? "opacity-0 scale-90" : "opacity-100 scale-100"
-              }`}
-            >
-              <Button
-                variant="secondary"
-                size="sm"
-                className={`flex items-center gap-2 ${
-                  darkMode
-                    ? "bg-gray-800/90 hover:bg-gray-700/100 border border-purple-400 text-purple-300"
-                    : "bg-background/90 hover:bg-background/100 border border-purple-100 text-purple-800"
-                } backdrop-blur-sm shadow-md transition-all duration-200`}
-                onClick={handleClearBoundary}
-              >
-                <X className={`h-4 w-4 ${darkMode ? "text-purple-300" : "text-purple-600"}`} />
-                <span>Clear area</span>
-              </Button>
-            </div>
+            <ClearBoundaryButton
+              darkMode={darkMode}
+              onClear={handleClearBoundary}
+              clearingBoundary={clearingBoundary}
+              renderControls={renderControls}
+            />
           )}
 
           {/* Drawing mode indicator */}
-          {isDrawingMode && (
-            <div className="absolute inset-0 pointer-events-none">
-              <div
-                className={`absolute inset-0 border-4 ${
-                  darkMode ? "border-purple-400" : "border-purple-600"
-                } animate-pulse opacity-50`}
-              />
-            </div>
-          )}
+          {isDrawingMode && <DrawingModeIndicator darkMode={darkMode} />}
         </Map>
       </APIProvider>
     </div>

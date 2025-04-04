@@ -45,16 +45,22 @@ export function FilterContainer({
           variant="outline"
           size={compact ? "sm" : "default"}
           className={cn(
-            "flex items-center gap-1 text-foreground justify-between font-normal",
-            compact ? "h-9" : "h-10"
+            "flex items-center gap-1 text-foreground justify-between font-normal w-full",
+            compact ? "h-9 sm:h-10" : "h-10",
+            "sm:text-sm md:text-base",
+            "truncate min-w-[110px] sm:min-w-[100px] md:min-w-[130px]"
           )}
           disabled={disabled}
         >
-          <span className="truncate">{label}</span>
-          <ChevronDown className="h-4 w-4 opacity-50" />
+          <span className="truncate max-w-[90%]">{label}</span>
+          <ChevronDown className="h-4 w-4 opacity-50 flex-shrink-0" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="p-0 z-50" align={compact ? "center" : "start"}>
+      <PopoverContent
+        className="p-0 z-50 w-auto min-w-[240px] sm:min-w-[260px]"
+        align={compact ? "center" : "start"}
+        side="bottom"
+      >
         {typeof children === "function" ? children(handleClose) : children}
       </PopoverContent>
     </Popover>

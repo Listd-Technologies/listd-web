@@ -1,76 +1,110 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
 import { useTheme } from "next-themes";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import simplify from "simplify-js";
 
-// ========================================================================
-// SHARED STATE & TYPES
-// ========================================================================
-
-// Persistent position tracking state at module level to prevent position loss
-// during component unmounts/remounts
-const v2CancellationState = {
-  center: { lat: 0, lng: 0 },
-  zoom: 0,
-  hasInitialized: false,
-};
-
-interface Point {
-  x: number;
-  y: number;
-}
-
-interface LatLng {
-  lat: number;
-  lng: number;
-}
-
-interface DrawingCanvasProps {
-  mapRef: React.RefObject<google.maps.Map>;
-  onDrawingFinish: (points: LatLng[]) => void;
-  onCancel: () => void;
-}
+// Import extracted components and utilities
+import { CancelDrawingButton } from "./components/cancel-drawing-button";
+import { DrawingInstructions } from "./components/drawing-instructions";
+import { DrawingCanvasProps, Point } from "./types/map-types";
+import { v2CancellationState } from "./utils/drawing-state";
+import { detectMobileDevice, pixelToLatLng, simplifyPoints } from "./utils/drawing-utils";
+import { useThemeColors } from "./utils/theme-utils";
 
 /**
- * Drawing canvas component that overlays Google Maps
- * Allows users to draw custom polygons for geographic searches
+ * DrawingCanvas - Freehand polygon drawing overlay for Google Maps
+ *
+ * This component renders a canvas over the Google Maps instance that allows users
+ * to draw custom polygons for geographic searches. It handles all drawing interactions,
+ * coordinates conversion between screen and map coordinates, and maintains map position
+ * stability during the entire drawing process.
+ *
+ * Key features:
+ * - Touch and mouse drawing support with device-specific optimizations
+ * - Position stability that eliminates map jumps and flickers
+ * - Theme awareness with dark/light mode support
+ * - Visual guidance for users through drawing instructions
+ * - Point simplification to optimize polygon performance
+ *
+ * @component
+ * @example
+ * ```tsx
+ * // Within a parent component that manages drawing state:
+ * const mapRef = useRef<google.maps.Map | null>(null);
+ * const [isDrawingMode, setIsDrawingMode] = useState(false);
+ *
+ * // Conditional rendering based on drawing mode
+ * {isDrawingMode && (
+ *   <DrawingCanvas
+ *     mapRef={mapRef}
+ *     onDrawingFinish={handleDrawComplete}
+ *     onCancel={() => setIsDrawingMode(false)}
+ *   />
+ * )}
+ * ```
  */
-export default function DrawingCanvas({ mapRef, onDrawingFinish, onCancel }: DrawingCanvasProps) {
+
+// ========================================================================
+// PROPS DOCUMENTATION
+// ========================================================================
+
+/**
+ * @typedef {Object} DrawingCanvasProps Properties for the DrawingCanvas component
+ *
+ * @property {React.RefObject<google.maps.Map>} mapRef - Reference to the Google Maps instance.
+ * This reference is used to access map methods, retrieve the current view position,
+ * and convert between screen coordinates and geographic coordinates.
+ * Example: useRef<google.maps.Map>(null)
+ *
+ * @property {function} onDrawingFinish - Callback fired when a drawing is completed.
+ * Receives an array of geographic coordinates (lat/lng) defining the drawn polygon.
+ * This function is typically used to create a boundary polygon on the map.
+ * Example: (points) => { createMapPolygon(points); }
+ *
+ * @property {function} onCancel - Callback fired when drawing is cancelled.
+ * Called when the user clicks the cancel button or when drawing should be aborted.
+ * This function typically exits drawing mode in the parent component.
+ * Example: () => { setIsDrawingMode(false); }
+ *
+ * @property {Object} [renderControls] - Custom control components to render within the drawing canvas.
+ * Allows overriding default UI elements with custom components.
+ * Example: { cancelDrawingButton: <CustomCancelButton />, drawingTipsToggleButton: <CustomTipsButton /> }
+ * @property {React.ReactNode} [renderControls.cancelDrawingButton] - Custom component to replace the default cancel button
+ * @property {React.ReactNode} [renderControls.drawingTipsToggleButton] - Custom component to replace the drawing tips toggle button
+ */
+export default function DrawingCanvas({
+  mapRef,
+  onDrawingFinish,
+  onCancel,
+  renderControls,
+}: DrawingCanvasProps) {
   // ========================================================================
   // STATE MANAGEMENT
   // ========================================================================
 
-  // Theme management
+  /**
+   * Theme management - automatically detects and adapts to dark/light mode
+   * Used for styling the drawing interface appropriately for each theme
+   */
   const { resolvedTheme } = useTheme();
   const isDarkMode = resolvedTheme === "dark";
 
-  // Theme-aware colors
-  const themeColors = {
-    primary: isDarkMode ? "#a78bfa" : "#6B21A8", // Light purple in dark mode, darker purple in light mode
-    secondary: isDarkMode ? "#8b5cf6" : "#7928CA", // Secondary purple
-    stroke: isDarkMode ? "#a78bfa" : "#6B21A8", // Line stroke color
-    fill: isDarkMode ? "rgba(167, 139, 250, 0.3)" : "rgba(107, 33, 168, 0.2)", // Semi-transparent fill
-    background: isDarkMode ? "#1f2937" : "#ffffff", // Background for UI elements
-    backgroundTransparent: isDarkMode ? "rgba(31, 41, 55, 0.9)" : "rgba(255, 255, 255, 0.9)", // Transparent background
-    border: isDarkMode ? "#4c1d95" : "#f3e8ff", // Border color
-    text: isDarkMode ? "#e5e7eb" : "#1e293b", // Main text color
-    textMuted: isDarkMode ? "#9ca3af" : "#64748b", // Secondary text color
-    textHighlight: isDarkMode ? "#c4b5fd" : "#6B21A8", // Highlighted text
-    indicator: isDarkMode ? "#a78bfa" : "#6B21A8", // Indicators and bullets
-    shadow: isDarkMode ? "rgba(0, 0, 0, 0.5)" : "rgba(0, 0, 0, 0.1)", // Shadow color
-  };
+  // Get theme-aware colors
+  const getThemeColors = useThemeColors(isDarkMode);
+  const themeColors = getThemeColors();
 
-  // DOM and drawing state
+  /**
+   * Drawing state - tracks the current drawing status and collected points
+   */
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawnPoints, setDrawnPoints] = useState<Point[]>([]);
   const [fadingOut, setFadingOut] = useState(false);
   const [cursorPosition, setCursorPosition] = useState<Point | null>(null);
 
-  // UI state
+  /**
+   * UI state - controls device-specific behaviors and user guidance
+   */
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [showTips, setShowTips] = useState(true);
 
@@ -78,7 +112,10 @@ export default function DrawingCanvas({ mapRef, onDrawingFinish, onCancel }: Dra
   // CANVAS & MAP UTILITIES
   // ========================================================================
 
-  // Clear canvas content
+  /**
+   * Clears all content from the drawing canvas
+   * Used when resetting drawing state or cancelling the operation
+   */
   const clearCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
@@ -87,71 +124,17 @@ export default function DrawingCanvas({ mapRef, onDrawingFinish, onCancel }: Dra
     }
   }, []);
 
-  // Convert pixel coordinates to map coordinates
-  const pixelToLatLng = useCallback(
-    (point: Point): LatLng | null => {
-      if (!mapRef.current) return null;
-
-      try {
-        const map = mapRef.current;
-        const bounds = map.getBounds();
-        if (!bounds) {
-          console.warn("Map bounds not available for coordinate conversion");
-          return null;
-        }
-
-        // Get map dimensions
-        const mapDiv = map.getDiv();
-        if (!mapDiv) return null;
-
-        const width = mapDiv.offsetWidth;
-        const height = mapDiv.offsetHeight;
-        if (width === 0 || height === 0) return null;
-
-        // Calculate conversion factors based on map bounds
-        const ne = bounds.getNorthEast();
-        const sw = bounds.getSouthWest();
-        const lngPerPx = (ne.lng() - sw.lng()) / width;
-        const latPerPx = (ne.lat() - sw.lat()) / height;
-
-        // Convert screen position to geographic coordinates
-        const lng = sw.lng() + point.x * lngPerPx;
-        const lat = ne.lat() - point.y * latPerPx; // Y is inverted in screen coordinates
-
-        return { lat, lng };
-      } catch (error) {
-        console.error("Error converting pixel to LatLng:", error);
-        return null;
-      }
-    },
-    [mapRef]
-  );
-
-  // Reduce point complexity while preserving shape
-  const simplifyPoints = useCallback((points: LatLng[]): LatLng[] => {
-    if (points.length < 3) return points;
-
-    // Format for simplify.js library
-    const formattedPoints = points.map((p) => ({ x: p.lng, y: p.lat }));
-
-    // Simplify with appropriate tolerance (adjust as needed)
-    const simplified = simplify(formattedPoints, 0.00001, true);
-
-    // Convert back to LatLng format
-    return simplified.map((p) => ({ lat: p.y, lng: p.x }));
-  }, []);
-
   // ========================================================================
   // LIFECYCLE HOOKS
   // ========================================================================
 
-  // Device detection
+  /**
+   * Device detection on component mount
+   * Determines whether to use touch-optimized interactions and UI
+   */
   useEffect(() => {
     // Detect mobile devices by user agent or screen size
-    setIsMobileDevice(
-      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-        window.innerWidth < 768
-    );
+    setIsMobileDevice(detectMobileDevice());
 
     // Auto-hide drawing tips on very small screens
     if (window.innerWidth < 360) {
@@ -159,7 +142,16 @@ export default function DrawingCanvas({ mapRef, onDrawingFinish, onCancel }: Dra
     }
   }, []);
 
-  // Canvas initialization and position stabilization
+  /**
+   * Canvas initialization and position stabilization
+   * Critical for maintaining map position during drawing mode transitions
+   *
+   * This effect:
+   * 1. Captures the exact map position to maintain consistency
+   * 2. Configures canvas dimensions to match the map
+   * 3. Sets up position stability monitoring
+   * 4. Manages map interaction modes for drawing
+   */
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !mapRef.current) return;
@@ -295,7 +287,18 @@ export default function DrawingCanvas({ mapRef, onDrawingFinish, onCancel }: Dra
   // DRAWING HANDLERS
   // ========================================================================
 
-  // Complete drawing and convert to map polygon
+  /**
+   * Completes the drawing process and converts screen points to a map polygon
+   *
+   * This function:
+   * 1. Preserves the map position for stability
+   * 2. Converts pixel coordinates to geographic coordinates
+   * 3. Simplifies points for better performance (reduces point count)
+   * 4. Notifies the parent component with the final polygon coordinates
+   * 5. Manages canvas cleanup and map control restoration
+   *
+   * @returns {void}
+   */
   const finishDrawing = useCallback(() => {
     if (drawnPoints.length < 3) {
       console.warn("Not enough points to create a valid polygon");
@@ -340,13 +343,13 @@ export default function DrawingCanvas({ mapRef, onDrawingFinish, onCancel }: Dra
     });
 
     // Convert screen points to geographic coordinates
-    const latLngPoints: LatLng[] = [];
-    drawnPoints.forEach((point) => {
-      const latLng = pixelToLatLng(point);
+    const latLngPoints = [];
+    for (const point of drawnPoints) {
+      const latLng = pixelToLatLng(point, mapRef);
       if (latLng) {
         latLngPoints.push(latLng);
       }
-    });
+    }
 
     // Close the polygon
     if (latLngPoints.length > 0) {
@@ -407,7 +410,12 @@ export default function DrawingCanvas({ mapRef, onDrawingFinish, onCancel }: Dra
     });
   }, [drawnPoints, pixelToLatLng, clearCanvas, onDrawingFinish, mapRef, simplifyPoints]);
 
-  // Start drawing on pointer down
+  /**
+   * Initiates drawing when the user presses down on the canvas
+   * Sets up the drawing context and starts tracking points
+   *
+   * @param {React.PointerEvent} e - Pointer event containing coordinate information
+   */
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       const canvas = canvasRef.current;
@@ -428,7 +436,7 @@ export default function DrawingCanvas({ mapRef, onDrawingFinish, onCancel }: Dra
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineWidth = isMobileDevice ? 3 : 2;
-      ctx.strokeStyle = themeColors.stroke; // Use theme-aware color
+      ctx.strokeStyle = themeColors.primary; // Use primary color instead of stroke
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.stroke();
@@ -439,7 +447,12 @@ export default function DrawingCanvas({ mapRef, onDrawingFinish, onCancel }: Dra
     [isMobileDevice, themeColors]
   );
 
-  // Continue drawing on pointer move
+  /**
+   * Continues drawing as the user moves across the canvas
+   * Tracks the cursor position and adds points to the drawing path
+   *
+   * @param {React.PointerEvent} e - Pointer event containing coordinate information
+   */
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
       // Always update cursor position for indicator
@@ -477,7 +490,12 @@ export default function DrawingCanvas({ mapRef, onDrawingFinish, onCancel }: Dra
     [isDrawing]
   );
 
-  // Complete drawing on pointer up
+  /**
+   * Completes the drawing when the user releases the pointer
+   * Finalizes the shape by connecting to the starting point
+   *
+   * @param {React.PointerEvent} e - Pointer event
+   */
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
       if (!isDrawing) return;
@@ -513,7 +531,13 @@ export default function DrawingCanvas({ mapRef, onDrawingFinish, onCancel }: Dra
     [isDrawing, drawnPoints, clearCanvas, finishDrawing]
   );
 
-  // Cancel drawing with animation
+  /**
+   * Cancels the drawing operation with a smooth transition
+   * Preserves map position and restores controls without visual jumps
+   *
+   * This function uses precise position tracking and requestAnimationFrame
+   * to ensure a flicker-free transition when cancelling
+   */
   const handleCancel = useCallback(() => {
     // First capture the exact map position before any state changes
     const map = mapRef.current;
@@ -592,12 +616,21 @@ export default function DrawingCanvas({ mapRef, onDrawingFinish, onCancel }: Dra
     });
   }, [clearCanvas, onCancel, mapRef]);
 
-  // Toggle tips visibility
+  /**
+   * Toggles the visibility of drawing instructions
+   * Allows users to hide/show guidance tips while drawing
+   *
+   * @param {React.MouseEvent} e - Mouse event
+   */
   const toggleTips = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setShowTips((prev) => !prev);
   }, []);
+
+  // ========================================================================
+  // COMPONENT RENDERING
+  // ========================================================================
 
   return (
     <div
@@ -638,145 +671,21 @@ export default function DrawingCanvas({ mapRef, onDrawingFinish, onCancel }: Dra
       )}
 
       {/* Drawing instructions */}
-      {isMobileDevice ? (
-        // Mobile instructions
-        <div className="absolute bottom-20 left-4 z-20 pointer-events-auto">
-          {showTips ? (
-            <div
-              className="backdrop-blur-sm p-3 rounded-md shadow-md max-w-[180px]"
-              style={{
-                backgroundColor: themeColors.backgroundTransparent,
-                borderColor: themeColors.border,
-                borderWidth: "1px",
-                color: themeColors.text,
-                boxShadow: `0 4px 6px ${themeColors.shadow}`,
-              }}
-            >
-              <div className="flex justify-between mb-1">
-                <div className="font-medium text-xs" style={{ color: themeColors.textHighlight }}>
-                  Drawing Tips:
-                </div>
-                <button
-                  onClick={toggleTips}
-                  className="hover:opacity-80"
-                  style={{ color: themeColors.textMuted }}
-                  aria-label="Close tips"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <ul className="text-xs space-y-1" style={{ color: themeColors.text }}>
-                <li className="flex items-start gap-1.5">
-                  <div
-                    className="w-1.5 h-1.5 rounded-full mt-1"
-                    style={{ backgroundColor: themeColors.indicator }}
-                  />
-                  <span>Use finger to draw</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <div
-                    className="w-1.5 h-1.5 rounded-full mt-1"
-                    style={{ backgroundColor: themeColors.indicator }}
-                  />
-                  <span>Draw slowly for accuracy</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <div
-                    className="w-1.5 h-1.5 rounded-full mt-1"
-                    style={{ backgroundColor: themeColors.indicator }}
-                  />
-                  <span>Simple shapes work best</span>
-                </li>
-              </ul>
-            </div>
-          ) : (
-            <button
-              onClick={toggleTips}
-              className="rounded-full w-10 h-10 flex items-center justify-center shadow-lg"
-              style={{
-                backgroundColor: themeColors.primary,
-                color: isDarkMode ? "#1f2937" : "#ffffff",
-                boxShadow: `0 4px 6px ${themeColors.shadow}`,
-              }}
-              aria-label="Show drawing tips"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 16v-4" />
-                <path d="M12 8h.01" />
-              </svg>
-            </button>
-          )}
-        </div>
-      ) : (
-        // Desktop instructions
-        <div
-          className="absolute top-1/2 left-8 transform -translate-y-1/2 backdrop-blur-sm p-3 rounded-md shadow-md z-20 max-w-xs"
-          style={{
-            backgroundColor: themeColors.backgroundTransparent,
-            borderColor: themeColors.border,
-            borderWidth: "1px",
-            color: themeColors.text,
-            boxShadow: `0 4px 6px ${themeColors.shadow}`,
-          }}
-        >
-          <div className="font-medium mb-2" style={{ color: themeColors.textHighlight }}>
-            Drawing Tips:
-          </div>
-          <ul className="text-sm space-y-1" style={{ color: themeColors.text }}>
-            <li className="flex items-center gap-1">
-              <div
-                className="w-1 h-1 rounded-full"
-                style={{ backgroundColor: themeColors.indicator }}
-              />
-              <span>Click and drag to draw a shape</span>
-            </li>
-            <li className="flex items-center gap-1">
-              <div
-                className="w-1 h-1 rounded-full"
-                style={{ backgroundColor: themeColors.indicator }}
-              />
-              <span>Release to complete drawing</span>
-            </li>
-            <li className="flex items-center gap-1">
-              <div
-                className="w-1 h-1 rounded-full"
-                style={{ backgroundColor: themeColors.indicator }}
-              />
-              <span>Simple shapes work best</span>
-            </li>
-          </ul>
-        </div>
-      )}
+      <DrawingInstructions
+        isMobileDevice={isMobileDevice}
+        showTips={showTips}
+        toggleTips={toggleTips}
+        themeColors={themeColors}
+        isDarkMode={isDarkMode}
+        renderControls={renderControls}
+      />
 
       {/* Cancel button */}
-      <div className="absolute top-4 right-4 z-50 pointer-events-auto">
-        <Button
-          variant="outline"
-          onClick={handleCancel}
-          className="flex items-center gap-2 shadow-md transition-all duration-200 backdrop-blur-sm py-2 px-4 font-medium"
-          style={{
-            backgroundColor: themeColors.backgroundTransparent,
-            borderColor: themeColors.primary,
-            borderWidth: "2px",
-            color: themeColors.textHighlight,
-            boxShadow: `0 4px 6px ${themeColors.shadow}`,
-          }}
-        >
-          <X className="w-4 h-4 mr-1" style={{ color: themeColors.textHighlight }} />
-          Cancel Drawing
-        </Button>
-      </div>
+      <CancelDrawingButton
+        themeColors={themeColors}
+        onCancel={handleCancel}
+        renderControls={renderControls}
+      />
     </div>
   );
 }

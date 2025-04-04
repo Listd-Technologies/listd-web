@@ -1,6 +1,15 @@
 "use client";
 
-import { usePropertyFiltersStore } from "@/lib/stores/propertyFilters";
+import {
+  selectActivePriceType,
+  selectListingType,
+  selectMaxPrice,
+  selectMaxSqmPrice,
+  selectMinPrice,
+  selectMinSqmPrice,
+  selectUpdateFilters,
+  usePropertyFiltersStore,
+} from "@/lib/stores/propertyFilters";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 // Price options for dropdowns - Buy (For Sale)
@@ -80,14 +89,14 @@ export type PriceType = "total" | "sqm";
  * Custom hook for managing price filter state and logic
  */
 export function usePriceFilter() {
-  // Use selective store access to prevent unnecessary rerenders
-  const listingType = usePropertyFiltersStore((state) => state.filters.listingType);
-  const minPrice = usePropertyFiltersStore((state) => state.filters.minPrice);
-  const maxPrice = usePropertyFiltersStore((state) => state.filters.maxPrice);
-  const minSqmPrice = usePropertyFiltersStore((state) => state.filters.minSqmPrice);
-  const maxSqmPrice = usePropertyFiltersStore((state) => state.filters.maxSqmPrice);
-  const activePriceType = usePropertyFiltersStore((state) => state.filters.activePriceType);
-  const updateFilters = usePropertyFiltersStore((state) => state.updateFilters);
+  // Use optimized selectors to prevent unnecessary rerenders
+  const listingType = usePropertyFiltersStore(selectListingType);
+  const minPrice = usePropertyFiltersStore(selectMinPrice);
+  const maxPrice = usePropertyFiltersStore(selectMaxPrice);
+  const minSqmPrice = usePropertyFiltersStore(selectMinSqmPrice);
+  const maxSqmPrice = usePropertyFiltersStore(selectMaxSqmPrice);
+  const activePriceType = usePropertyFiltersStore(selectActivePriceType);
+  const updateFilters = usePropertyFiltersStore(selectUpdateFilters);
 
   // Local state for form inputs
   const [localMinPrice, setLocalMinPrice] = useState(minPrice?.toString() || "0");

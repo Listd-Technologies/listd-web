@@ -25,6 +25,7 @@ interface PropertyTypeFilterContentProps {
 
 /**
  * The internal content component for the property type filter
+ * Changes apply immediately when an option is selected
  */
 export function PropertyTypeFilterContent({
   propertyType,
@@ -32,27 +33,28 @@ export function PropertyTypeFilterContent({
   onPropertyTypeChange,
   onClose,
 }: PropertyTypeFilterContentProps) {
+  // Handler to apply changes and close the popover
+  const handleOptionClick = (type: PropertyType) => {
+    onPropertyTypeChange(type);
+    if (onClose) {
+      onClose();
+    }
+  };
+
   return (
     <div className="w-full p-4 flex flex-col">
-      <div className="mb-6 space-y-2">
+      <div className="space-y-2">
         {propertyTypeOptions.map((option) => (
           <Button
             key={option.id}
             variant={propertyType === option.value ? "default" : "outline"}
             className="w-full justify-start font-normal"
             disabled={option.disabled}
-            onClick={() => onPropertyTypeChange(option.value)}
+            onClick={() => handleOptionClick(option.value)}
           >
             {option.name}
           </Button>
         ))}
-      </div>
-
-      {/* Action button */}
-      <div className="flex justify-end">
-        <Button size="sm" onClick={onClose}>
-          Apply
-        </Button>
       </div>
     </div>
   );

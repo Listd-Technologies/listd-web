@@ -3,16 +3,34 @@ description:
 globs: 
 alwaysApply: true
 ---
-# Coding pattern preferences
+Coding Pattern Preferences
 
-- Always prefer simple solutions
-- Avoid duplication of code whenever possible, which means checking for other areas of the codebase that might already have similar code and functionality
-- Write code that takes into account the different environments: dev, test, and prod
-- You are careful to only make changes that are requested or you are confident are well understood and related to the change being requested
-- When fixing an issue or bug, do not introduce a new pattern or technology without first exhausting all options for the existing implementation. And if you finally do this, make sure to remove the old implementation afterwards so we don't have duplicate logic.
-- Keep the codebase very clean and organized
-- Avoid writing scripts in files if possible, especially if the script is likely only to be run once
-- Avoid having files over 200-300 lines of code. Refactor at that point.
-- Mocking data is only needed for tests, never mock data for dev or prod
-- Never add stubbing or fake data patterns to code that affects the dev or prod environments
-- Never overwrite my .env file without first asking and confirming
+- Avoid Code Duplication: Always check for existing functions or utilities before writing new code. Reuse existing logic when appropriate.
+
+- TypeScript Compliance: Never use TypeScript suppression comments (// @ts-ignore or // @ts-expect-error). Ensure code is fully type-safe.
+
+- Environment Awareness: Code should account for different environments (dev, test, prod) without hard-coded variables or unsafe assumptions.
+
+- Targeted Changes: Only make changes that are directly related to the task. Avoid unnecessary modifications to unrelated files or logic.
+
+- Bug Fixing: When resolving issues, prioritize using the current implementation. Avoid introducing new technologies or patterns without proper justification and approval.
+
+- Code Cleanliness: Maintain a clean and organized codebase. Large files exceeding 300 lines should be refactored.
+
+- Script Management: Avoid placing temporary scripts in code files. Keep scripts in designated folders if necessary.
+
+- Mocking Restrictions: Only use mock data for tests. Never use mock or fake data in dev or production environments.
+
+- Environment Configuration: Never overwrite .env files without explicit approval.
+
+Coding Workflow Preferences
+
+- Task-Focused: Stay focused on the code relevant to the assigned task. Avoid unnecessary refactoring.
+
+- Minimal Disruption: Do not alter unrelated code or architecture without clear instructions.
+
+- Testing Requirements: Write thorough tests for major functionality, ensuring robust coverage for any new or modified code.
+
+- Feature Stability: Avoid reworking well-functioning features unless explicitly directed.
+
+- Impact Awareness: Consider the ripple effects of code changes on other components or services.

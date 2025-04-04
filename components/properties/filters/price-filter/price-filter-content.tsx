@@ -116,10 +116,10 @@ export function PriceFilterContent({
           <TabsContent value="sqm" className="mt-4 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Min Price per sqm</label>
+                <label className="text-sm font-medium">Min Price</label>
                 <Select value={minSqmPrice} onValueChange={onMinSqmPriceChange}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Min Price per sqm" />
+                    <SelectValue placeholder="Min Price" />
                   </SelectTrigger>
                   <SelectContent>
                     {minSqmPriceOptions.map((option) => (
@@ -132,10 +132,10 @@ export function PriceFilterContent({
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Max Price per sqm</label>
+                <label className="text-sm font-medium">Max Price</label>
                 <Select value={maxSqmPrice} onValueChange={onMaxSqmPriceChange}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Max Price per sqm" />
+                    <SelectValue placeholder="Max Price" />
                   </SelectTrigger>
                   <SelectContent>
                     {maxSqmPriceOptions.map((option) => (

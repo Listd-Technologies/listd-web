@@ -6,7 +6,8 @@ import { useProperties as usePropertiesV1 } from "@/hooks/api/v1";
 import { usePropertyFilters } from "@/hooks/usePropertyFilters";
 import { cn } from "@/lib/utils";
 import { PropertyType } from "@/types/property";
-import { List, Map as MapIcon } from "lucide-react";
+import { List, Map as MapIcon, Pencil, X } from "lucide-react";
+import { useTheme } from "next-themes";
 import React, {
   useState,
   useCallback,
@@ -36,22 +37,6 @@ const PropertyMap = lazy(() =>
     default: module.PropertyMap,
   }))
 );
-
-// Add Map Draw control component
-const MapDrawControl = () => {
-  const { isDrawingMode, toggleDrawingMode } = useDrawingMode();
-
-  return (
-    <Button
-      onClick={toggleDrawingMode}
-      variant={isDrawingMode ? "default" : "outline"}
-      size="sm"
-      className="absolute top-4 right-4 z-10 bg-background shadow-md"
-    >
-      {isDrawingMode ? "Cancel Drawing" : "Draw Area"}
-    </Button>
-  );
-};
 
 // Context for sharing drawing mode state between components
 interface DrawingModeContextType {
@@ -126,6 +111,7 @@ interface PropertyMapItem {
 export default function PropertiesPageClient() {
   // Use our property filters hook to ensure state persists across page reloads
   const { filters, updateFilters } = usePropertyFilters();
+  const { resolvedTheme } = useTheme();
 
   // View mode controls which view is active on mobile (map or list)
   // On desktop, both are visible in split view
@@ -147,6 +133,9 @@ export default function PropertiesPageClient() {
     center: null,
     radius: null,
   });
+
+  // Track boundary existence state
+  const [hasBoundary, setHasBoundary] = useState(false);
 
   // Effect to detect when Google Maps API is ready
   useEffect(() => {
@@ -180,15 +169,10 @@ export default function PropertiesPageClient() {
             center = new google.maps.LatLng(filters.centerLat, filters.centerLng);
           } catch (error) {
             console.error("Error creating LatLng object:", error);
-            // Create a fallback object with the same interface
+            // Simplified mock with just the essential methods that are actually used
             center = {
               lat: () => filters.centerLat,
               lng: () => filters.centerLng,
-              equals: () => false,
-              toString: () => `(${filters.centerLat}, ${filters.centerLng})`,
-              // Add required methods to match LatLng interface
-              toJSON: () => ({ lat: filters.centerLat, lng: filters.centerLng }),
-              toUrlValue: () => `${filters.centerLat},${filters.centerLng}`,
             } as unknown as google.maps.LatLng; // Type assertion to satisfy TypeScript
           }
 
@@ -214,58 +198,21 @@ export default function PropertiesPageClient() {
             bounds = new google.maps.LatLngBounds(sw, ne);
           } catch (error) {
             console.error("Error creating LatLngBounds object:", error);
-            // Create a more complete fallback object with the same interface
+            // Simplified mockBounds with just the essential methods that are actually used
             const mockBounds = {
+              // Only implement the methods that are actually used in our code
               getSouthWest: () => ({
                 lat: () => filters.boundMinY,
                 lng: () => filters.boundMinX,
-                equals: () => false,
-                toString: () => `(${filters.boundMinY}, ${filters.boundMinX})`,
-                toJSON: () => ({ lat: filters.boundMinY, lng: filters.boundMinX }),
-                toUrlValue: () => `${filters.boundMinY},${filters.boundMinX}`,
               }),
               getNorthEast: () => ({
                 lat: () => filters.boundMaxY,
                 lng: () => filters.boundMaxX,
-                equals: () => false,
-                toString: () => `(${filters.boundMaxY}, ${filters.boundMaxX})`,
-                toJSON: () => ({ lat: filters.boundMaxY, lng: filters.boundMaxX }),
-                toUrlValue: () => `${filters.boundMaxY},${filters.boundMaxX}`,
               }),
-              contains: () => false,
-              toString: () =>
-                `((${filters.boundMinY}, ${filters.boundMinX}), (${filters.boundMaxY}, ${filters.boundMaxX}))`,
-              // Add required methods to match LatLngBounds interface
-              equals: () => false,
-              extend: () => mockBounds,
               getCenter: () => ({
                 lat: () => (filters.boundMinY! + filters.boundMaxY!) / 2,
                 lng: () => (filters.boundMinX! + filters.boundMaxX!) / 2,
-                equals: () => false,
-                toString: () =>
-                  `(${(filters.boundMinY! + filters.boundMaxY!) / 2}, ${(filters.boundMinX! + filters.boundMaxX!) / 2})`,
-                toJSON: () => ({
-                  lat: (filters.boundMinY! + filters.boundMaxY!) / 2,
-                  lng: (filters.boundMinX! + filters.boundMaxX!) / 2,
-                }),
-                toUrlValue: () =>
-                  `${(filters.boundMinY! + filters.boundMaxY!) / 2},${(filters.boundMinX! + filters.boundMaxX!) / 2}`,
               }),
-              intersects: () => false,
-              isEmpty: () => false,
-              toJSON: () => ({
-                south: filters.boundMinY,
-                west: filters.boundMinX,
-                north: filters.boundMaxY,
-                east: filters.boundMaxX,
-              }),
-              toSpan: () => ({
-                lat: () => Math.abs(filters.boundMaxY! - filters.boundMinY!),
-                lng: () => Math.abs(filters.boundMaxX! - filters.boundMinX!),
-              }),
-              toUrlValue: () =>
-                `${filters.boundMinY},${filters.boundMinX},${filters.boundMaxY},${filters.boundMaxX}`,
-              union: () => mockBounds,
             };
 
             bounds = mockBounds as unknown as google.maps.LatLngBounds;
@@ -335,6 +282,9 @@ export default function PropertiesPageClient() {
         center: newCenter,
         radius: newRadius,
       });
+
+      // Update hasBoundary state
+      setHasBoundary(!!newBounds || !!newCenter);
 
       // Sync with URL parameters
       if (newCenter && newRadius) {
@@ -433,16 +383,74 @@ export default function PropertiesPageClient() {
             }
           }}
           onBoundaryChange={(hasBoundary) => {
-            // This is a different onBoundaryChange than our handleBoundaryChange
-            // This one just indicates if a boundary exists (boolean)
+            // Update local boundary state
+            setHasBoundary(hasBoundary);
             console.log(`Map has boundary: ${hasBoundary}`);
           }}
           // @ts-ignore - Use type assertion until Phase 3 when we properly fix types
           properties={mapProperties}
           initialBoundary={drawnArea}
           preserveView={true} // Preserve the view when the component re-renders
+          renderControls={{
+            clearBoundaryButton: (
+              <Button
+                variant="secondary"
+                size="sm"
+                className={`flex items-center gap-2 ${
+                  resolvedTheme === "dark"
+                    ? "bg-gray-800/90 hover:bg-gray-700/100 border border-purple-400 text-purple-300"
+                    : "bg-background/90 hover:bg-background/100 border border-purple-100 text-purple-800"
+                } backdrop-blur-sm shadow-md transition-all duration-200`}
+              >
+                <X
+                  className={`h-4 w-4 ${resolvedTheme === "dark" ? "text-purple-300" : "text-purple-600"}`}
+                />
+                <span>Clear area</span>
+              </Button>
+            ),
+            cancelDrawingButton: (
+              <Button
+                variant="outline"
+                className="flex items-center gap-2 shadow-md transition-all duration-200 backdrop-blur-sm py-2 px-4 font-medium"
+                style={{
+                  backgroundColor:
+                    resolvedTheme === "dark" ? "rgba(31, 41, 55, 0.9)" : "rgba(255, 255, 255, 0.9)",
+                  borderColor: resolvedTheme === "dark" ? "#4c1d95" : "#6B21A8",
+                  borderWidth: "2px",
+                  color: resolvedTheme === "dark" ? "#e5e7eb" : "#6B21A8",
+                  boxShadow: `0 4px 6px ${resolvedTheme === "dark" ? "rgba(0, 0, 0, 0.5)" : "rgba(0, 0, 0, 0.1)"}`,
+                }}
+              >
+                <X
+                  className="w-4 h-4 mr-1"
+                  style={{ color: resolvedTheme === "dark" ? "#e5e7eb" : "#6B21A8" }}
+                />
+                Cancel Drawing
+              </Button>
+            ),
+          }}
         />
-        <MapDrawControl />
+
+        {/* Draw area button - shown when no boundary exists and not in drawing mode */}
+        {!isDrawingMode && !hasBoundary && (
+          <div className="absolute top-4 right-4 z-20">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={toggleDrawingMode}
+              className={`flex items-center gap-2 ${
+                resolvedTheme === "dark"
+                  ? "bg-gray-800/90 hover:bg-gray-700/100 border border-purple-400 text-purple-300"
+                  : "bg-background/90 hover:bg-background/100 border border-purple-100 text-purple-800"
+              } backdrop-blur-sm shadow-md transition-all duration-200`}
+            >
+              <Pencil
+                className={`h-4 w-4 ${resolvedTheme === "dark" ? "text-purple-300" : "text-purple-600"}`}
+              />
+              <span>Draw Area</span>
+            </Button>
+          </div>
+        )}
       </div>
     </Suspense>
   );
@@ -450,16 +458,16 @@ export default function PropertiesPageClient() {
   // Create list section content
   const listSection = (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="p-2 sm:p-4">
-        <ResponsiveFilters />
+      <div className="p-2 sm:p-3 md:p-4">
+        <ResponsiveFilters className="max-w-[1200px] mx-auto" />
       </div>
-      <div className="flex-1 overflow-auto px-2 sm:px-4">
+      <div className="flex-1 overflow-auto px-2 sm:px-3 md:px-4">
         {/* Use virtualized list for better performance with large datasets */}
         {propertiesDataV1?.pages?.[0]?.data?.results &&
         propertiesDataV1.pages[0].data.results.length > 0 ? (
           <VirtualizedVerticalList
             properties={propertiesDataV1.pages[0].data.results}
-            className="pb-8"
+            className="pb-4"
             onPropertyClick={(id) => {
               window.location.href = `/properties/showcase/${id}`;
             }}
@@ -494,7 +502,7 @@ export default function PropertiesPageClient() {
             tabletColumns={1}
             desktopColumns={1}
             displayStyle="vertical"
-            className="space-y-4 pb-8"
+            className="space-y-4 pb-4"
             properties={propertiesDataV1?.pages?.[0]?.data?.results || []}
             error={null}
           />
@@ -505,7 +513,7 @@ export default function PropertiesPageClient() {
 
   // Mobile view controls with better accessibility
   const mobileViewControls = (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 flex gap-2 bg-background border rounded-full shadow-lg p-1 z-10 xl:hidden">
+    <div className="fixed bottom-2 left-1/2 -translate-x-1/2 flex gap-2 bg-background border rounded-full shadow-lg p-1 z-10 xl:hidden">
       <Button
         variant={mobileViewMode === "list" ? "default" : "outline"}
         size="icon"
@@ -576,7 +584,7 @@ export default function PropertiesPageClient() {
         {/* Mobile view (either list or map) - shown only on screens < xl breakpoint */}
         <div className="block xl:hidden h-full">
           {mobileViewMode === "list" ? (
-            <VerticalLayout>{listSection}</VerticalLayout>
+            <VerticalLayout className="h-full max-h-full">{listSection}</VerticalLayout>
           ) : (
             <HorizontalLayout>{mapSection}</HorizontalLayout>
           )}

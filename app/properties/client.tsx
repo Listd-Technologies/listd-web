@@ -476,15 +476,15 @@ export default function PropertiesPageClient() {
             >
               <PropertyMap
                 className="z-0"
+                preserveView={true}
                 properties={allProperties}
+                isDrawingMode={isDrawingMode}
+                onDrawComplete={handleDrawComplete}
+                toggleDrawingMode={toggleDrawingMode}
+                onBoundaryChange={handleBoundaryChange}
                 onMarkerClick={(propertyId) => {
                   console.log(`Clicked on property marker ${propertyId}`);
                 }}
-                onDrawComplete={handleDrawComplete}
-                isDrawingMode={isDrawingMode}
-                toggleDrawingMode={toggleDrawingMode}
-                preserveView={true}
-                onBoundaryChange={handleBoundaryChange}
               />
             </Suspense>
 

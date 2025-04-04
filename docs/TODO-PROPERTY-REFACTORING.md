@@ -14,7 +14,7 @@ This document outlines the specific tasks needed to implement the refactoring pl
 - [x] Implement improved versions of PropertyCard and PropertyListingGrid
 - [x] Ensure interoperability between old and new component versions
 - [x] Document migration strategy
-- [ ] Create feature parity matrix between old and new implementations
+- [x] Create feature parity matrix between old and new implementations
 
 ### Filter Components
 - [x] Create reusable `FilterContainer` component
@@ -71,10 +71,16 @@ This document outlines the specific tasks needed to implement the refactoring pl
 ## Phase 3: State Management Optimizations
 
 ### Zustand Store Refinement
-- [ ] Update selector usage to be more specific and prevent unnecessary rerenders
+- [x] Update selector usage to be more specific and prevent unnecessary rerenders:
+  - [x] Create specific selectors for each filter type
+  - [x] Use shallow equality checks for complex state
+  - [x] Apply memoization to derived values
 - [x] Create dedicated hook for filters to manage state (`usePriceFilter`)
 - [ ] Add devtools middleware for better debugging
-- [ ] Optimize store updates
+- [ ] Optimize store updates by:
+  - [ ] Batching related changes
+  - [ ] Using immer for immutable updates
+  - [ ] Implementing selective state updates
 
 ### Filter Hooks
 - [ ] Create dedicated hook for each filter type:
@@ -129,16 +135,24 @@ This document outlines the specific tasks needed to implement the refactoring pl
 - [x] Ensure proper cleanup of map resources
 
 ### Map UI Improvements
-- [ ] Refine map controls positioning and styling
+- [x] Refine map controls positioning and styling
 - [x] Improve mobile map experience
 - [x] Ensure map maintains state properly across view changes
+- [x] Streamline location filter integration with map drawing controls
 
 ## Cross-cutting Concerns
 
 ### Accessibility
-- [ ] Add proper keyboard navigation to filters
-- [ ] Implement appropriate ARIA attributes
-- [ ] Test with screen readers
+- [ ] Add proper keyboard navigation to filters:
+  - [ ] Support Tab navigation through filter options
+  - [ ] Add Enter/Space key support for selection
+  - [ ] Implement Escape key to close dialogs
+- [ ] Implement appropriate ARIA attributes:
+  - [ ] aria-label for interactive elements
+  - [ ] aria-expanded for expandable sections
+  - [ ] aria-selected for selectable items
+  - [ ] aria-controls for related elements
+- [ ] Test with screen readers (VoiceOver, NVDA)
 - [ ] Add support for reduced motion
 - [ ] Verify color contrast ratios
 

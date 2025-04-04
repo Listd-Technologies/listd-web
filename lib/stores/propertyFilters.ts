@@ -99,3 +99,59 @@ export const usePropertyFiltersStore = create<PropertyFiltersState>()(
     }
   )
 );
+
+// Optimized selectors to prevent unnecessary rerenders
+
+/**
+ * Selectors for property type filter
+ * Use these instead of directly accessing the full filters object
+ */
+export const selectPropertyType = (state: PropertyFiltersState) => state.filters.propertyType;
+
+/**
+ * Selectors for listing type filter
+ */
+export const selectListingType = (state: PropertyFiltersState) => state.filters.listingType;
+
+/**
+ * Selectors for price filters
+ */
+export const selectMinPrice = (state: PropertyFiltersState) => state.filters.minPrice;
+export const selectMaxPrice = (state: PropertyFiltersState) => state.filters.maxPrice;
+export const selectMinSqmPrice = (state: PropertyFiltersState) => state.filters.minSqmPrice;
+export const selectMaxSqmPrice = (state: PropertyFiltersState) => state.filters.maxSqmPrice;
+export const selectActivePriceType = (state: PropertyFiltersState) => state.filters.activePriceType;
+
+/**
+ * Selectors for room filters
+ */
+export const selectMinBedrooms = (state: PropertyFiltersState) => state.filters.minBedrooms;
+export const selectMinBathrooms = (state: PropertyFiltersState) => state.filters.minBathrooms;
+
+/**
+ * Selectors for area filters
+ */
+export const selectMinArea = (state: PropertyFiltersState) => state.filters.minArea;
+export const selectMaxArea = (state: PropertyFiltersState) => state.filters.maxArea;
+
+/**
+ * Selector for location filter
+ */
+export const selectLocation = (state: PropertyFiltersState) => state.filters.location;
+
+/**
+ * Selectors for sorting options
+ */
+export const selectSortField = (state: PropertyFiltersState) => state.filters.sortField;
+export const selectSortOrder = (state: PropertyFiltersState) => state.filters.sortOrder;
+
+/**
+ * Selectors for actions
+ */
+export const selectUpdateFilters = (state: PropertyFiltersState) => state.updateFilters;
+export const selectResetFilters = (state: PropertyFiltersState) => state.resetFilters;
+export const selectGetV1QueryParams = (state: PropertyFiltersState) => state.getV1QueryParams;
+
+// Example usage:
+// const propertyType = usePropertyFiltersStore(selectPropertyType);
+// const { updateFilters } = usePropertyFiltersStore(state => ({ updateFilters: state.updateFilters }));

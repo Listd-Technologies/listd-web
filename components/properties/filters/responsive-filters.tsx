@@ -4,7 +4,15 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Filter, X } from "lucide-react";
 import React, { useState } from "react";
-import { PropertyFilters } from ".";
+import {
+  AreaFilter,
+  BathroomsFilter,
+  BedroomsFilter,
+  ListingTypeFilter,
+  PriceFilter,
+  PropertyFilters,
+  PropertyTypeFilter,
+} from ".";
 
 interface ResponsiveFiltersProps {
   /** Whether to use compact mode for filters */
@@ -16,7 +24,8 @@ interface ResponsiveFiltersProps {
 /**
  * Responsive filter bar that changes layout based on screen size
  * - On mobile: horizontal scrollable list with expand button
- * - On tablet+: full width with filters wrapping
+ * - On tablet: optimized grid layout with better spacing
+ * - On desktop: full width with filters wrapping
  */
 export function ResponsiveFilters({ compact = false, className }: ResponsiveFiltersProps) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -44,10 +53,10 @@ export function ResponsiveFilters({ compact = false, className }: ResponsiveFilt
 
   return (
     <div className={cn("relative w-full", className)}>
-      {/* Mobile and tablet view (scrollable) */}
+      {/* Mobile view (scrollable) */}
       <div
         className={cn(
-          "w-full flex items-center gap-2 relative md:hidden",
+          "w-full flex items-center gap-2 relative sm:hidden",
           isExpanded ? "h-auto" : "h-12 overflow-hidden"
         )}
       >
@@ -96,6 +105,22 @@ export function ResponsiveFilters({ compact = false, className }: ResponsiveFilt
             </Button>
           </>
         )}
+      </div>
+
+      {/* Tablet view (optimized grid layout) */}
+      <div className="hidden sm:block md:hidden">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+          <div className="col-span-2">
+            <div className="flex gap-2 mb-2">
+              <ListingTypeFilter compact={compact} className="flex-1" />
+              <PropertyTypeFilter compact={compact} className="flex-1" />
+            </div>
+          </div>
+          <AreaFilter compact={compact} />
+          <PriceFilter compact={compact} />
+          <BedroomsFilter compact={compact} />
+          <BathroomsFilter compact={compact} />
+        </div>
       </div>
 
       {/* Desktop view (wrapped) */}

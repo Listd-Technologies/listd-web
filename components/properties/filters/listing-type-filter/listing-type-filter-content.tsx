@@ -25,6 +25,7 @@ interface ListingTypeFilterContentProps {
 /**
  * The internal content component for the listing type filter
  * Uses a toggle button style for the two options
+ * Changes apply immediately when an option is selected
  */
 export function ListingTypeFilterContent({
   listingType,
@@ -32,10 +33,18 @@ export function ListingTypeFilterContent({
   onListingTypeChange,
   onClose,
 }: ListingTypeFilterContentProps) {
+  // Handler to apply changes and close the popover
+  const handleOptionClick = (type: ListingType) => {
+    onListingTypeChange(type);
+    if (onClose) {
+      onClose();
+    }
+  };
+
   return (
     <div className="w-full p-4 flex flex-col">
       {/* Toggle button style for Buy/Rent */}
-      <div className="mb-6">
+      <div className="mb-2">
         <div className="flex rounded-md overflow-hidden border">
           {listingTypeOptions.map((option) => (
             <Button
@@ -43,7 +52,7 @@ export function ListingTypeFilterContent({
               type="button"
               variant={listingType === option.value ? "default" : "ghost"}
               className="flex-1 rounded-none text-center"
-              onClick={() => onListingTypeChange(option.value)}
+              onClick={() => handleOptionClick(option.value)}
             >
               {option.name}
             </Button>
@@ -54,13 +63,6 @@ export function ListingTypeFilterContent({
             ? "Search for properties that are for sale"
             : "Search for properties that are for rent"}
         </p>
-      </div>
-
-      {/* Action button */}
-      <div className="flex justify-end">
-        <Button size="sm" onClick={onClose}>
-          Apply
-        </Button>
       </div>
     </div>
   );
