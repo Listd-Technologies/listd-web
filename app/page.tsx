@@ -1,6 +1,7 @@
 import { FeaturesSection } from "@/components/homepage/features-section";
 import { HeroSection } from "@/components/homepage/hero-section";
 import { LandlordSection } from "@/components/homepage/landlord-section";
+import SuggestedPropertiesSection from "@/components/homepage/suggested-properties-section";
 import { ValuationSection } from "@/components/homepage/valuation-section";
 import type { Metadata } from "next";
 
@@ -235,6 +236,7 @@ export default function Home() {
       <HeroSection />
       <ValuationSection />
       <FeaturesSection />
+      <SuggestedPropertiesSection />
       <LandlordSection />
     </>
   );

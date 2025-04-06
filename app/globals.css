@@ -46,6 +46,16 @@
   --color-selected-bg: var(--selected-bg);
 }
 
+/* .gradient-background {
+  background: linear-gradient(0deg, theme('colors.white'), theme('colors.white')),
+              linear-gradient(180deg, rgba(236, 253, 245, 0.24) 0%, rgba(236, 253, 245, 0) 100%);
+}
+
+.dark-gradient-background {
+  background: linear-gradient(0deg, theme('colors.background'), theme('colors.background')),
+              linear-gradient(180deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0) 100%);
+} */
+
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);

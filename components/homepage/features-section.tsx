@@ -2,6 +2,11 @@
 
 import { AnimatedSection } from "@/components/ui/animated-section";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { useTheme } from "next-themes";
+import { useEffect } from "react";
+import Image from "next/image";
+import { useState } from "react";
 
 const features = [
   {
@@ -87,40 +92,50 @@ const features = [
 ];
 
 export function FeaturesSection() {
+  const [isMounted, setIsMounted] = useState(false);
+  const { theme, resolvedTheme } = useTheme();
+
+  // Use the resolved theme or fall back to a default during SSR
+  const currentTheme = theme === "system" ? resolvedTheme : theme;
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+  
   return (
-    <AnimatedSection className="py-16 md:py-20 bg-background" delay={0.1}>
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12 mb-12 lg:mb-20">
-          <div className="lg:col-span-1">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-4">
+    <AnimatedSection className="py-16 md:py-8 bg-background" delay={0.1}>
+      <div className="container grid gap-x-0 grid-cols-1 md:grid-cols-3 mx-auto px-4 sm:px-6 lg:px-8">
+        <div 
+        // removed grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12
+        className="col-span-1 p-6 rounded bg-primary-foreground  mb-12 md:mb-0">
+          <div className=" mb-8">
+            <h2 className="text-[2rem] leading-10 sm:text-3xl font-bold mb-4">
               The new way to find your new home
             </h2>
             <p className="text-foreground/80 mb-6">
               Find your dream place to live in with more than 10k+ properties listed.
             </p>
-            <Button className="bg-primary hover:bg-primary/90 text-white">Evaluate</Button>
+            <Button className={
+              cn(
+                "bg-primary hover:bg-primary/90 text-white px-4 py-2.5",
+                isMounted && currentTheme === "dark"
+                ? "bg-[#a855f7] hover:bg-[#9333ea]"
+                : "bg-[#6b21a8] hover:bg-[#581c87]"
+              )
+            }>Create Listing</Button>
           </div>
 
-          <div className="lg:col-span-2">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-              {features.slice(0, 2).map((feature, index) => (
-                <div
-                  key={index}
-                  className="p-5 lg:p-6 rounded-lg border hover:shadow-md transition-shadow"
-                >
-                  <div className="bg-primary/10 p-3 rounded-full w-fit mb-4">
-                    <div className="text-primary">{feature.icon}</div>
-                  </div>
-                  <h3 className="text-lg lg:text-xl font-semibold mb-2 lg:mb-3">{feature.title}</h3>
-                  <p className="text-sm text-foreground/70">{feature.description}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+          <Image
+            src="/house-for-sale.svg"
+            alt="House for sale"
+            width={500}
+            height={500}
+            className="w-full h-fit mb-8"
+          />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-          {features.slice(2).map((feature, index) => (
+        <div className="col-span-2 md:pl-20 grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+          {features.map((feature, index) => (
             <div
               key={index + 2}
               className="p-5 lg:p-6 rounded-lg border hover:shadow-md transition-shadow"
