@@ -50,7 +50,7 @@ export function Navbar() {
           {/* Logo and Navigation */}
           <div className="flex items-center">
             <Link href="/" className="flex-shrink-0 mr-8">
-              <span className="text-xl font-bold">Listd</span>
+              <span className="text-2xl font-bold">Listd</span>
             </Link>
 
             {/* Desktop Navigation Links */}
