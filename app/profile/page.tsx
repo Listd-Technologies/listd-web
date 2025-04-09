@@ -13,7 +13,6 @@ import {
   Home, 
   Lock, 
   Check, 
-  Star, 
   ChevronRight, 
   Mail, 
   Phone, 
@@ -109,13 +108,7 @@ export default function ProfilePage() {
                 </Avatar>
                 <h2 className="text-xl font-bold">{getFullName()}</h2>
                 <p className="text-sm text-muted-foreground">{clerkUser?.emailAddresses?.[0]?.emailAddress}</p>
-                <div className="flex items-center mt-2">
-                  <Badge variant="outline" className="bg-primary/10 text-primary">
-                    <Star className="h-3 w-3 mr-1" />
-                    4.2
-                  </Badge>
-                </div>
-
+                
                 <Button 
                   variant="outline" 
                   className="mt-4 text-sm"
@@ -192,10 +185,6 @@ export default function ProfilePage() {
             <CardHeader className="pb-0">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-bold">{getFullName()}</h2>
-                <Badge variant="outline" className="bg-primary/10 text-primary">
-                  <Star className="h-3 w-3 mr-1" />
-                  4.2
-                </Badge>
               </div>
             </CardHeader>
             <CardContent>
@@ -237,9 +226,6 @@ export default function ProfilePage() {
                           <div className="flex items-center mb-2">
                             <div className="bg-gray-200 h-8 w-8 rounded-full mr-2"></div>
                             <span className="font-medium">{review.name}</span>
-                            <Badge variant="outline" className="ml-2 bg-primary/10 text-primary">
-                              {review.rating}
-                            </Badge>
                           </div>
                           <p className="text-sm text-gray-600">{review.text}</p>
                         </div>
