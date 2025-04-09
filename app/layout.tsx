@@ -98,24 +98,25 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  
   return (
     <ClerkProvider>
-      <html lang="en" suppressHydrationWarning>
-        <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-          <ThemeProvider>
-            <ReactQueryProvider>
-              <PropertyFiltersProvider>
-                <div className="flex min-h-screen flex-col">
-                  <Navbar />
-                  <main className="flex-1">{children}</main>
-                  <Footer />
-                </div>
-                {/* Development Tools - always available in development mode */}
-              </PropertyFiltersProvider>
-            </ReactQueryProvider>
-          </ThemeProvider>
-        </body>
-      </html>
+        <html lang="en" suppressHydrationWarning>
+          <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+            <ThemeProvider>
+              <ReactQueryProvider>
+                {/* <PropertyFiltersProvider> */}
+                  <div className="flex min-h-screen flex-col">
+                    <Navbar />
+                    <main className="flex-1">{children}</main>
+                    <Footer />
+                  </div>
+                  {/* Development Tools - always available in development mode */}
+                {/* </PropertyFiltersProvider> */}
+              </ReactQueryProvider>
+            </ThemeProvider>
+          </body>
+        </html>
     </ClerkProvider>
   );
 }

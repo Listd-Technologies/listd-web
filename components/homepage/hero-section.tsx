@@ -118,7 +118,7 @@ export function HeroSection() {
             <div className="flex flex-col md:flex-col-reverse gap-y-8 md:gap-y-10 w-full">
               <motion.div
                 // removed max-w-4xl md:bg-background/95 md:dark:bg-gray-900/95
-                className="relative w-full px-4 md:px-0"
+                className="relative w-full px-4 md:px-0 z-1"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
@@ -172,7 +172,7 @@ export function HeroSection() {
                   </AnimatePresence>
                 </div>
 
-                <div className="mx-0 md:mx-0 md:absolute top-full left-0 md:min-w-[50vw] z-1 bg-white w-full shadow-b-xs rounded-b-lg md:rounded-b-md p-4 md:p-6 font-medium text-neutral-500 text-base text-left ">
+                <div className="mx-0 md:mx-0 md:absolute top-full left-0 md:min-w-[50vw] z-2 bg-white w-full shadow-b-xs rounded-b-lg md:rounded-b-md p-4 md:p-6 font-medium text-neutral-500 text-base text-left ">
                   <button  className="lg:hidden w-full flex items-center justify-between">
                     Search Location
                     <div className="p-3 rounded-lg bg-primary">
