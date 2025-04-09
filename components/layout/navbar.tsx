@@ -7,6 +7,10 @@ import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useAuth } from "@clerk/nextjs";
+import { useGetUserData } from "@/apis/user/get-user-data";
+import { redirect } from "next/navigation";
+import { UserButton } from "./user-button";
 
 const navLinks = [
   { href: "/properties", label: "Properties", preserveParams: true },
@@ -21,6 +25,18 @@ export function Navbar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isLoaded, isSignedIn } = useAuth();
+
+  // const {data: userData} = useGetUserData( {
+  //   enabled: isSignedIn && isLoaded,
+  //   staleTime: 10000
+  // });
+
+  // useEffect(() => {
+  //   if(userData && userData.address === "No address provided" && pathname !== "/update-profile" && isLoaded && isSignedIn) {
+  //     redirect('/update-profile')
+  //   }
+  // }, [userData, pathname, isLoaded, isSignedIn]);
 
   // Check if we're in development mode
   const isDevelopment = process.env.NODE_ENV === "development";
@@ -89,12 +105,17 @@ export function Navbar() {
           {/* Actions */}
           <div className="flex items-center gap-2 md:gap-4">
             <ModeToggle />
-            <Button
-              asChild
-              className="bg-primary hover:bg-primary/90 px-5 py-2 h-10 rounded-md hidden sm:inline-flex"
-            >
-              <Link href="/login">Login</Link>
-            </Button>
+            {isLoaded ? (
+              isSignedIn ? (
+                <UserButton />
+              ) : (
+                <Button asChild className="bg-primary hover:bg-primary/90 px-5 py-2 h-10 rounded-md hidden sm:inline-flex">
+                  <Link href="/login">Login</Link>
+                </Button>
+              )
+            ) : (
+              <div className="h-10 w-10 rounded-full bg-gray-200 animate-pulse"></div>
+            )}
 
             {/* Mobile menu button */}
             <button
@@ -147,9 +168,17 @@ export function Navbar() {
                 </Link>
               ))}
 
-            <Button asChild className="bg-primary hover:bg-primary/90 mt-2 w-full">
-              <Link href="/login">Login</Link>
-            </Button>
+            {isLoaded ? (
+              isSignedIn ? (
+                <UserButton />
+              ) : (
+                <Button asChild className="bg-primary hover:bg-primary/90 mt-2 w-full">
+                  <Link href="/login">Login</Link>
+                </Button>
+              )
+            ) : (
+              <div className="h-10 w-10 rounded-full bg-gray-200 animate-pulse"></div>
+            )}
           </div>
         </div>
       )}

@@ -1,9 +1,11 @@
+import { getUserData } from "@/apis/user/get-user-data";
 import { FeaturesSection } from "@/components/homepage/features-section";
 import { HeroSection } from "@/components/homepage/hero-section";
 import { LandlordSection } from "@/components/homepage/landlord-section";
 import SuggestedPropertiesSection from "@/components/homepage/suggested-properties-section";
 import { ValuationSection } from "@/components/homepage/valuation-section";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
   title: "Listd - Buy, Rent, or Sell Properties Without Commission | Philippine Real Estate",
@@ -46,7 +48,7 @@ export const metadata: Metadata = {
   },
 };
 
-export default function Home() {
+export default async function Home() {
   // Organization Schema
   const organizationSchema = {
     "@context": "https://schema.org",
@@ -210,6 +212,8 @@ export default function Home() {
       },
     ],
   };
+
+ 
 
   return (
     <>
